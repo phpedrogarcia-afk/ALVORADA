@@ -1,0 +1,34 @@
+Reading package lists...
+Building dependency tree...
+Reading state information...
+The following additional packages will be installed:
+  google-android-licenses intltool-debian po-debconf
+Suggested packages:
+  libmail-box-perl
+Recommended packages:
+  libmail-sendmail-perl
+The following NEW packages will be installed:
+  google-android-licenses google-android-platform-tools-installer
+  intltool-debian po-debconf
+0 upgraded, 4 newly installed, 0 to remove and 89 not upgraded.
+Need to get 289 kB of archives.
+After this operation, 18.1 MB of additional disk space will be used.
+Err:1 https://snapshot.ubuntu.com/ubuntu/20260828T000000Z noble/main amd64 intltool-debian all 0.35.0+20060710.6
+  Could not open file /var/cache/apt/archives/partial/intltool-debian_0.35.0+20060710.6_all.deb - open (13: Permission denied) [IP: 127.0.0.1 44281]
+Err:2 https://snapshot.ubuntu.com/ubuntu/20260828T000000Z noble/main amd64 po-debconf all 1.0.21+nmu1
+  Could not open file /var/cache/apt/archives/partial/po-debconf_1.0.21+nmu1_all.deb - open (13: Permission denied) [IP: 127.0.0.1 44281]
+Err:3 https://snapshot.ubuntu.com/ubuntu/20260828T000000Z noble/multiverse amd64 google-android-licenses all 1710437545-3build2
+  Could not open file /var/cache/apt/archives/partial/google-android-licenses_1710437545-3build2_all.deb - open (13: Permission denied) [IP: 127.0.0.1 44281]
+Err:4 https://snapshot.ubuntu.com/ubuntu/20260828T000000Z noble/multiverse amd64 google-android-platform-tools-installer amd64 35.0.0+1710437545-3build2
+  Could not open file /var/cache/apt/archives/partial/google-android-platform-tools-installer_35.0.0+1710437545-3build2_amd64.deb - open (13: Permission denied) [IP: 127.0.0.1 44281]
+W: chmod 0700 of directory /var/cache/apt/archives/partial failed - SetupAPTPartialDirectory (1: Operation not permitted)
+W: Problem unlinking the file /var/cache/apt/archives/partial/intltool-debian_0.35.0+20060710.6_all.deb - PrepareFiles (13: Permission denied)
+W: Problem unlinking the file /var/cache/apt/archives/partial/po-debconf_1.0.21+nmu1_all.deb - PrepareFiles (13: Permission denied)
+W: Problem unlinking the file /var/cache/apt/archives/partial/google-android-licenses_1710437545-3build2_all.deb - PrepareFiles (13: Permission denied)
+W: Problem unlinking the file /var/cache/apt/archives/partial/google-android-platform-tools-installer_35.0.0+1710437545-3build2_amd64.deb - PrepareFiles (13: Permission denied)
+E: Failed to fetch https://snapshot.ubuntu.com/ubuntu/20260828T000000Z/pool/main/i/intltool-debian/intltool-debian_0.35.0%2b20060710.6_all.deb  Could not open file /var/cache/apt/archives/partial/intltool-debian_0.35.0+20060710.6_all.deb - open (13: Permission denied) [IP: 127.0.0.1 44281]
+E: Failed to fetch https://snapshot.ubuntu.com/ubuntu/20260828T000000Z/pool/main/p/po-debconf/po-debconf_1.0.21%2bnmu1_all.deb  Could not open file /var/cache/apt/archives/partial/po-debconf_1.0.21+nmu1_all.deb - open (13: Permission denied) [IP: 127.0.0.1 44281]
+E: Failed to fetch https://snapshot.ubuntu.com/ubuntu/20260828T000000Z/pool/multiverse/g/google-android-installers/google-android-licenses_1710437545-3build2_all.deb  Could not open file /var/cache/apt/archives/partial/google-android-licenses_1710437545-3build2_all.deb - open (13: Permission denied) [IP: 127.0.0.1 44281]
+E: Failed to fetch https://snapshot.ubuntu.com/ubuntu/20260828T000000Z/pool/multiverse/g/google-android-installers/google-android-platform-tools-installer_35.0.0%2b1710437545-3build2_amd64.deb  Could not open file /var/cache/apt/archives/partial/google-android-platform-tools-installer_35.0.0+1710437545-3build2_amd64.deb - open (13: Permission denied) [IP: 127.0.0.1 44281]
+E: Some files failed to download
+apt_download_only_exit_code=100

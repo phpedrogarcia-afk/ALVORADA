@@ -1,0 +1,42 @@
+name: E1 lab discovery
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: e1-lab-discovery-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  discover-linux-acceleration:
+    name: Discover standard Ubuntu runner
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    env:
+      ALVORADA_REPOSITORY_VISIBILITY: ${{ github.event.repository.private && 'private' || 'public' }}
+      ALVORADA_WORKFLOW_PERMISSIONS: contents:read
+    steps:
+      - name: Checkout exact commit
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+
+      - name: Record route discovery
+        working-directory: experiments/reliability-harness
+        shell: bash
+        run: |
+          set +e
+          ./scripts/audit-lab-routes.sh --ci 2>&1 | tee e1-lab-discovery.log
+          status=${PIPESTATUS[0]}
+          printf 'audit_exit_code=%s\n' "$status" | tee -a e1-lab-discovery.log
+          exit "$status"
+
+      - name: Preserve discovery log
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: e1-lab-discovery-${{ github.sha }}-${{ github.run_id }}
+          path: experiments/reliability-harness/e1-lab-discovery.log
+          if-no-files-found: error
+          retention-days: 30

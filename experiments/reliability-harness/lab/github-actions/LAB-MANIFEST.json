@@ -1,0 +1,131 @@
+{
+  "schema_version": 2,
+  "manifest_id": "G1.3-MISSION-05R-BINDING-20260912",
+  "status": "BINDING_BLOCKED",
+  "purpose": "Authorize and bind one zero-overage GitHub Actions E1 lab; not an E1 scenario result",
+  "captured_at_utc": "2026-09-12T21:37:00Z",
+  "financial_cost_incurred_usd": 0,
+  "founder_authorization": {
+    "repository_visibility": "PRIVATE",
+    "repository_strategy": "ONE_CANONICAL_REPOSITORY",
+    "preferred_repository": "phpedrogarcia-afk/alvorada",
+    "provider": "GitHub Actions",
+    "runner_label": "ubuntu-24.04",
+    "runner_class": "STANDARD_GITHUB_HOSTED",
+    "paid_overage_authorized": false,
+    "larger_runner_authorized": false,
+    "external_paid_infrastructure_authorized": false
+  },
+  "repository_preflight": {
+    "authenticated_owner": "phpedrogarcia-afk",
+    "accessible_repositories_inspected": 7,
+    "appropriate_existing_alvorada_repository_observed": false,
+    "overwrite_risk_observed": false,
+    "repository_created": false,
+    "repository_url": null,
+    "actions_enabled": "UNKNOWN_REPOSITORY_NOT_CREATED",
+    "execution_binding": "BLOCKED",
+    "blocking_reason": "No authorized operation available to create the repository; no GitHub CLI or task-scoped token is configured"
+  },
+  "zero_overage_guardrail": {
+    "goal": "PAID_OVERAGE_ALLOWED=FALSE",
+    "github_plan_detected": "UNKNOWN",
+    "included_minutes_observed": null,
+    "current_consumption_minutes_observed": null,
+    "remaining_minutes_observed": null,
+    "payment_method_state": "UNKNOWN",
+    "actions_budget_state": "UNKNOWN",
+    "hard_stop_confirmed": false,
+    "workflow_execution_authorized_now": false,
+    "manual_action_reference": "evidence/g1/raw-mission05r/binding-preflight.md"
+  },
+  "lineage": {
+    "e0_baseline_commit": "06a8cbbc2b75e9b2e415f87574b5a1307b524d8b",
+    "mission05_discovery_package_commit": "c0ac4775833266b10ce486d146aa7013f74a5d1a",
+    "both_commits_present_in_local_harness_history": true,
+    "canonical_remote_commit": null,
+    "migration_performed": false,
+    "migration_map_required": false,
+    "provenance_status": "LOCAL_LINEAGE_PRESERVED_REMOTE_BINDING_NOT_PERFORMED"
+  },
+  "discovery": {
+    "workflow_path": ".github/workflows/e1-lab-discovery.yml",
+    "workflow_exists_locally": true,
+    "workflow_run_id": null,
+    "runner_image": null,
+    "runner_os": null,
+    "cpu": null,
+    "memory": null,
+    "disk": null,
+    "kvm_available": "UNKNOWN_NOT_RUN",
+    "android_sdk_available": "UNKNOWN_NOT_RUN",
+    "emulator_installable": "UNKNOWN_NOT_RUN",
+    "avd_creation_possible": "UNKNOWN_NOT_RUN",
+    "classification": "NOT_RUN_BINDING_BLOCKED"
+  },
+  "api36_precheck": {
+    "classification": "NOT_RUN_BINDING_BLOCKED",
+    "cmdline_tools_revision": null,
+    "platform_tools_revision": null,
+    "emulator_revision": null,
+    "build_tools_revision": null,
+    "platform_package": null,
+    "system_image_package": null,
+    "jdk_revision": null,
+    "gradle_revision": null,
+    "android_gradle_plugin_revision": null,
+    "avd_name": null,
+    "build_fingerprint": null,
+    "cold_boot_observed": false,
+    "guest_reboot_observed": false,
+    "hello_probe": "NOT_CREATED"
+  },
+  "prechecks": {
+    "P1_SDK_PRESENT": "UNKNOWN",
+    "P2_ANDROID_ARTIFACT_COMPILES": "UNKNOWN",
+    "P3_APK_INSTALLS": "UNKNOWN",
+    "P4_ADB_COMMUNICATES": "UNKNOWN",
+    "P5_AVD_BOOTS": "UNKNOWN",
+    "P6_TEST_CONTROL_WORKS": "UNKNOWN",
+    "P7_LOGS_AND_EXPORT_WORK": "UNKNOWN",
+    "P8_GUEST_REBOOT_WORKS": "UNKNOWN",
+    "P9_COLD_BOOT_SEMANTICS_UNDERSTOOD": "UNKNOWN",
+    "P10_EVIDENCE_PERSISTS_OUTSIDE_GUEST": "UNKNOWN"
+  },
+  "workflow_supply_chain": [
+    {
+      "action": "actions/checkout",
+      "owner": "GitHub",
+      "version_or_sha": "fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09",
+      "purpose": "Check out the bound repository",
+      "trust_basis": "Official GitHub-maintained action, pinned to immutable commit"
+    },
+    {
+      "action": "actions/upload-artifact",
+      "owner": "GitHub",
+      "version_or_sha": "ea165f8d65b6e75b540449e92b4886f43607fa02",
+      "purpose": "Persist discovery evidence outside the ephemeral runner",
+      "trust_basis": "Official GitHub-maintained action, pinned to immutable commit"
+    }
+  ],
+  "security": {
+    "workflow_permissions": "contents:read",
+    "secrets_required": false,
+    "tokens_in_logs": false,
+    "third_party_actions": []
+  },
+  "stop_condition": {
+    "reliability_adapter_allowed": false,
+    "e1_wave1_allowed": false,
+    "ready_for_e1_wave1": false,
+    "reason": "EXECUTION_BINDING and zero-overage hard stop are not proven; P1-P10 are UNKNOWN"
+  },
+  "sources": [
+    "https://docs.github.com/billing/managing-billing-for-github-actions/about-billing-for-github-actions",
+    "https://docs.github.com/en/billing/reference/product-usage-included",
+    "https://docs.github.com/en/billing/how-tos/set-up-budgets",
+    "https://docs.github.com/en/actions/reference/runners/github-hosted-runners",
+    "https://github.com/actions/runner-images/blob/main/images/ubuntu/Ubuntu2404-Readme.md",
+    "https://developer.android.com/studio/run/emulator-acceleration"
+  ]
+}
