@@ -17,11 +17,11 @@ Não há adapter Android compilado nesta versão porque o ambiente auditado não
 
 ## G1.3 — recuperação do laboratório
 
-A auditoria de 2026-09-12 manteve `LOCAL_ACCELERATED_AVAILABLE=NO`: este container não expõe `/dev/kvm`. Nenhum endpoint Android remoto foi encontrado. GitHub-hosted Linux possui aceleração Android documentada, mas o harness não tem remoto e não existe repositório ALVORADA autorizado na conta conectada. Portanto `CI_ACCELERATED_PLATFORM_CAPABILITY=YES` não equivale a `CI_EXECUTION_BINDING=YES`.
+A auditoria de 2026-09-12 manteve `LOCAL_ACCELERATED_AVAILABLE=NO`: este container não expõe `/dev/kvm`. O repo privado `phpedrogarcia-afk/ALVORADA` agora contém o snapshot canônico e o workflow manual, mas Actions habilitado, hard stop de overage e o runner real ainda não foram observados. Portanto `REPOSITORY_BINDING=PASS` não equivale a `LAB_DISCOVERY_PASS`.
 
 O candidato preservado em `lab/github-actions/LAB-MANIFEST.json` é um runner efêmero `ubuntu-24.04`. O workflow `.github/workflows/e1-lab-discovery.yml` executa apenas descoberta e arquiva seu log; ele **não** executa E1 nem satisfaz os dez prechecks. As revisões exatas de emulator e system images permanecem deliberadamente abertas até a primeira descoberta real. Nenhum repositório externo foi criado ou reutilizado, nenhum custo foi incorrido e nenhum adapter Android não compilado foi adicionado.
 
-Próximo passo obrigatório: o fundador deve fornecer um repositório/runner dedicado e autorizar sua visibilidade/custo. Depois, executar a descoberta, congelar as revisões resolvidas, implementar e compilar o adapter fino, completar os dez prechecks e só então iniciar Wave 1 em API 36.
+Próximo passo obrigatório: o fundador deve comprovar hard stop de overage, saldo incluído e Actions habilitado. Depois, executar somente discovery; se passar, congelar as revisões e completar o precheck mínimo API 36. Adapter e Wave 1 pertencem à missão seguinte.
 
 ## Poucos comandos
 

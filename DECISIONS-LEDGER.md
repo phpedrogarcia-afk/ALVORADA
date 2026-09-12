@@ -467,6 +467,21 @@ Data de registro: 2026-09-11. Todas são políticas para investigação; não s�
 - **reversibilidade:** Alta antes de iniciar a missão futura.
 - **condição para reabrir:** Mudança de escopo, risco ou orçamento antes da execução.
 
+## Decisão explícita recebida na MISSÃO 05R
+
+### D-G1-LAB-01 — Binding privado e zero-overage
+
+- **data:** 2026-09-12
+- **status:** ACCEPTED
+- **contexto:** GitHub-hosted Linux era capacidade documentada, mas ALVORADA não possuía binding executável.
+- **decisão:** Usar um único repositório privado canônico `ALVORADA`, GitHub Actions como laboratório E1 primário, runner standard `ubuntu-24.04`, somente minutos incluídos e `PAID_OVERAGE_ALLOWED = FALSE`.
+- **alternativas consideradas:** Repo público, vários repos, larger runner pago, infraestrutura paga externa e self-hosted; não escolhidos nesta missão.
+- **racional:** Tornar a execução rastreável sem exposição pública, fragmentação ou autorização financeira implícita.
+- **evidência:** Decisão do fundador na MISSÃO 05R; repo privado e snapshot confirmados em `EVID-G1-0012`.
+- **consequências:** Discovery só pode rodar após hard stop de overage, saldo e Actions habilitado serem observados; adapter/Wave 1 continuam fora da missão.
+- **reversibilidade:** Média no provedor/runner; baixa na proibição de cobrança silenciosa.
+- **condição para reabrir:** GitHub-hosted standard provar-se inviável, franquia insuficiente ou risco de custo/privacidade exigir nova decisão explícita.
+
 ## Propostas G1 que ainda NÃO são decisões aceitas
 
 | ID | Proposta / questão | Condição de aceitação |

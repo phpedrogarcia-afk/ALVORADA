@@ -1,7 +1,7 @@
 # AI — START HERE
 
 **Projeto:** ALVORADA — codinome provisório  
-**Estado:** G0 PASS; G1 CONDITIONAL; G1.1 PASS; G1.2 `E0_PASS`; G1.3/MISSÃO 05 `LAB_BLOCKED`. Próximo trabalho: fundador autorizar binding do runner e então retomar prechecks/E1; não E2/G2.
+**Estado canônico:** sempre em `SOURCE-OF-TRUTH.md`; não replique aqui um snapshot que possa envelhecer.
 
 ## Ordem mínima de leitura
 

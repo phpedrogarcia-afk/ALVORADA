@@ -1,6 +1,7 @@
 {
   "schema_version": 2,
   "manifest_id": "G1-CUMULATIVE-20260912T173725Z",
+  "current_status": "MISSION_05R_BINDING_BLOCKED_ZERO_OVERAGE_UNCONFIRMED",
   "harness_version": "0.1.0",
   "harness_git_commit_sha": "c0ac4775833266b10ce486d146aa7013f74a5d1a",
   "e0_baseline_commit_sha": "06a8cbbc2b75e9b2e415f87574b5a1307b524d8b",
@@ -100,6 +101,23 @@
     "system_images": [],
     "avds": [],
     "evidence_ids": ["EVID-G1-0009", "EVID-G1-0010"]
+  },
+  "mission05r_repository_binding": {
+    "status": "PASS_REPOSITORY_BINDING_EXECUTION_BLOCKED",
+    "repository": "phpedrogarcia-afk/ALVORADA",
+    "visibility": "private",
+    "canonical_import_commit": "68769e9337fae4f301a31d76a92dce5c287f841b",
+    "canonical_import_tree": "00bf5c9badfdaca0d6a41189f5689e0bcfcfc567",
+    "snapshot_file_count": 53,
+    "root_discovery_workflow": ".github/workflows/e1-lab-discovery.yml",
+    "workflow_run_id": null,
+    "paid_overage_allowed": "UNKNOWN_NOT_CONFIRMED",
+    "actions_enabled_by_policy": "UNKNOWN",
+    "financial_cost_incurred_usd": 0,
+    "prechecks_passed": 0,
+    "prechecks_unknown": 10,
+    "evidence_ids": ["EVID-G1-0011", "EVID-G1-0012"],
+    "migration_note": "Old local SHAs are traceable through a migration map but are not ancestors of the provider-authored remote commits"
   },
   "artifacts": {
     "audio_marker_path": "experiments/reliability-harness/build/audio-marker.wav",

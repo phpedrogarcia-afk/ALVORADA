@@ -1,11 +1,11 @@
 # SUPPORTED RELIABILITY ENVELOPE
 
-ALVORADA — codinome. 2026-09-12. **G1 CONDITIONAL; G1.2 = E0_PASS; G1.3/MISSÃO 05 = LAB_BLOCKED**.
+ALVORADA — codinome. 2026-09-12. **G1 CONDITIONAL; G1.2 = E0_PASS; G1.3/MISSÃO 05R = BINDING_BLOCKED_ZERO_OVERAGE_UNCONFIRMED**.
 **Envelope validado atual: conjunto vazio.** O modelo JVM passou E0; nenhuma combinação Android/aparelho/build/app foi executada. O quadro abaixo é proposta de qualificação, não suporte anunciado.
 
 ## Evidência instrumental atual
 
-`EVID-G1-0002..0003` validam somente a coerência executável do modelo no harness `0.1.0`. `EVID-G1-0004..0008` são preflights `ENVIRONMENT_BLOCKED`; `EVID-G1-0009..0010` auditam rotas e FACT-DOC, mas não executam Android. GitHub Linux é capaz em documentação e ainda não está vinculado ao projeto. Total: zero APIs e zero cenários E1; nenhuma célula foi adicionada por interpolação, sucesso JVM ou capacidade do provedor.
+`EVID-G1-0002..0003` validam somente a coerência executável do modelo no harness `0.1.0`. `EVID-G1-0004..0008` são preflights `ENVIRONMENT_BLOCKED`; `EVID-G1-0009..0012` auditam rota e binding, mas não executam Android. O repo privado está vinculado; runner, KVM, SDK e P1–P10 permanecem não observados. Total: zero APIs e zero cenários E1; nenhuma célula foi adicionada por interpolação, sucesso JVM, binding ou capacidade do provedor.
 
 ## Eixos que identificam uma célula de suporte
 
