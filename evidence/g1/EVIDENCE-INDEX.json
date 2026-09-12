@@ -308,6 +308,78 @@
         "MISSÃO 05R / BEFORE CREATE",
         "SCAR-G1-04"
       ]
+    },
+    {
+      "evidence_id": "EVID-G1-0012",
+      "evidence_level": "REPOSITORY_BINDING_AND_SNAPSHOT_MIGRATION",
+      "device_or_emulator": "NONE",
+      "api": null,
+      "build_fingerprint": null,
+      "scenario": "BIND_PRIVATE_CANONICAL_REPOSITORY_WITH_FOUNDATION_G1_HARNESS_AND_EVIDENCE",
+      "scheduling_strategy": "NOT_REACHED",
+      "preconditions": "Founder-created empty private repository and explicit authorization to upload the complete project snapshot with named exclusions",
+      "permission_state": "Owner admin/push observed; workflow permissions declared contents:read; Actions policy and billing controls unobserved",
+      "scheduled_time": null,
+      "captured_at_utc": "2026-09-12T22:17:23Z",
+      "repository": {
+        "repository_full_name": "phpedrogarcia-afk/ALVORADA",
+        "visibility": "private",
+        "owner": "phpedrogarcia-afk",
+        "initial_commit": "d415bc4ed0cc1d128e68505b0c7f306725dae2e1",
+        "imported_tree": "00bf5c9badfdaca0d6a41189f5689e0bcfcfc567",
+        "canonical_import_commit": "68769e9337fae4f301a31d76a92dce5c287f841b",
+        "workflow": ".github/workflows/e1-lab-discovery.yml",
+        "workflow_blob": "0f48cf3a4530f963a3e986415847a101d88069d5",
+        "workflow_run_id": null,
+        "runner_image": null
+      },
+      "event_timeline": [
+        "Confirm repository is private, owner-controlled, and empty",
+        "Receive explicit founder authorization for the complete snapshot upload",
+        "Exclude uploads, credentials, local build output, nested Git metadata, and opaque history bundle",
+        "Create root workflow-dispatch-only discovery workflow",
+        "Build a 53-file remote tree and fast-forward main to the import commit",
+        "Fetch the root workflow and LAB manifest back from main",
+        "Stop before workflow dispatch because zero-overage hard stop is unconfirmed"
+      ],
+      "metrics": {
+        "snapshot_file_count": 53,
+        "workflow_runs": 0,
+        "actions_minutes_consumed_by_mission": 0,
+        "financial_cost_usd": 0,
+        "hard_stop_confirmed": false,
+        "p1_p10_pass_count": 0,
+        "p1_p10_unknown_count": 10
+      },
+      "migration_map": [
+        {
+          "old_commit": "06a8cbbc2b75e9b2e415f87574b5a1307b524d8b",
+          "new_commit": "68769e9337fae4f301a31d76a92dce5c287f841b",
+          "content_equivalence_method": "TRACEABILITY_ONLY_E0_ARTIFACTS_AND_CHECKSUMS_IMPORTED_NO_TREE_EQUIVALENCE_CLAIM"
+        },
+        {
+          "old_commit": "c0ac4775833266b10ce486d146aa7013f74a5d1a",
+          "new_commit": "68769e9337fae4f301a31d76a92dce5c287f841b",
+          "content_equivalence_method": "TRACEABILITY_ONLY_DISCOVERY_PACKAGE_IMPORTED_NO_COMMIT_IDENTITY_CLAIM"
+        },
+        {
+          "old_commit": "0bb5e6cfcd571dc90d36f12830fb44a2de7de9e5",
+          "new_commit": "68769e9337fae4f301a31d76a92dce5c287f841b",
+          "content_equivalence_method": "53_FILE_SNAPSHOT_KEY_FILES_FETCHED_BACK_FULL_CLONE_AUDIT_PENDING"
+        }
+      ],
+      "result": "PASS_REPOSITORY_BINDING",
+      "severity": null,
+      "raw_log_reference": "evidence/g1/raw-mission05r/repository-binding.md",
+      "artifact_sha256": "fe7911b6e051e2407cbf73b3e73a243660359ad67772c8d903f0fa503ebe4eb5",
+      "manifest_reference": "experiments/reliability-harness/lab/github-actions/LAB-MANIFEST.json",
+      "manifest_sha256": "b94213f104bffc1f3532028d478ba7a2ba958f94d74b0dea97eccbf74ab7081d",
+      "related_contract_clause": [
+        "MISSÃO 05R / REPOSITORY STRATEGY",
+        "MISSÃO 05R / MIGRATION / BINDING",
+        "MISSÃO 05R / EVIDENCE PROVENANCE CHECK",
+        "MISSÃO 05R / ZERO-COST GUARDRAIL"
+      ]
     }
   ]
 }

@@ -1,7 +1,7 @@
 # SOURCE OF TRUTH
 
 **Snapshot:** 2026-09-12 · **ALVORADA: codinome**  
-**G0: PASS. G1: CONDITIONAL. G1.1: PASS. G1.2: E0_PASS. G1.3 / MISSÃO 05: LAB_BLOCKED.** `READY_FOR_INSTRUMENTED_EVIDENCE = YES`, mas `CI_EXECUTION_BINDING = NO`; envelope validado vazio. G2 não liberado.
+**G0: PASS. G1: CONDITIONAL. G1.1: PASS. G1.2: E0_PASS. G1.3 / MISSÃO 05R: BINDING_BLOCKED_ZERO_OVERAGE_UNCONFIRMED.** `REPOSITORY_BINDING = PASS`, mas `LAB_DISCOVERY = NOT_RUN`, P1–P10 = `UNKNOWN` e `READY_FOR_E1_WAVE1 = NO`; envelope validado vazio. G2 não liberado.
 
 ## Visão atual
 
@@ -24,7 +24,9 @@ Despertar sereno e eficaz, alarme primeiro, contexto seletivo e local-first. And
 | F-011 | FACT-EVID | E1 executou zero cenários: APIs 31/34/35/36/37 ficaram bloqueadas por ausência de SDK/tools/imagens/AVDs; cinco preflights, nenhum resultado Android | `EVID-G1-0004..0008` |
 | F-012 | FACT-DOC / FACT-EVID | O setup oficial classifica API 37 no canal Preview; localmente API 37 está indisponível | Android 17 setup; `EVID-G1-0008` |
 | F-013 | FACT-DOC | Em 2026-09-12: Play exige target API 36+ para novos apps/updates; API 37 segue Preview; alarm/timer segue uso legítimo e restrito de exact alarm | Fontes oficiais revalidadas em `EVID-G1-0010` |
-| F-014 | FACT-EVID | GitHub-hosted Linux possui aceleração Android documentada, mas o projeto não tem repo/runner autorizado; capacidade de CI não é binding executável | `EVID-G1-0009..0010`; sete repos inspecionados, zero ALVORADA |
+| F-014 | FACT-EVID histórico | Na MISSÃO 05, GitHub-hosted Linux tinha aceleração Android documentada, mas o projeto ainda não possuía repo/runner autorizado; capacidade de CI não era binding executável | `EVID-G1-0009..0010`; sete repos então inspecionados, zero ALVORADA |
+| F-015 | FACT-EVID | O fundador criou `phpedrogarcia-afk/ALVORADA`; repo privado/admin confirmado e snapshot Foundation+G1+harness+evidências vinculado no import commit `68769e9337fae4f301a31d76a92dce5c287f841b` | `EVID-G1-0012`; 53 arquivos, workflow manual presente |
+| F-016 | FACT-EVID | Plano, franquia/consumo de Actions, hard stop de overage e habilitação de Actions por política não são observáveis pelo canal atual; nenhum workflow rodou e custo = USD 0 | `EVID-G1-0011..0012`; P1–P10 `UNKNOWN` |
 
 FACTs documentais Android, APIs, URLs, confiança e divergências estão em [ANDROID-RELIABILITY-RESEARCH.md](docs/reliability/ANDROID-RELIABILITY-RESEARCH.md), não duplicados aqui.
 
@@ -41,6 +43,7 @@ D-001–D-012 continuam vigentes no ledger: centro estreito, codinome, prioridad
 | D-EXPERIENCE-CORE-01 | G2 prioriza paisagem sonora, voz serena, nome, hora, mensagem breve e Escalada Serena; visual apoia; mascote não obrigatório |
 | D-G1-READINESS-01 | Ausência de capacidade essencial deve ser explícita; intenção salva não é alarme confiável armado |
 | D-G1-TELEMETRY-01 | Telemetria mínima local primeiro; envio remoto permanece OPEN |
+| D-G1-LAB-01 | Para a MISSÃO 05R: um repo privado canônico `ALVORADA`, GitHub Actions, runner standard `ubuntu-24.04`, somente minutos incluídos e nenhum overage pago |
 
 F-03-01–F-03-15 também estão ACCEPTED no ledger: investigar API 31+; hora civil/fuso; gap/fold; late recovery de 10 min; bandas 2/5 s e 1/3 s; soneca 5 min; dismiss occurrence-scoped; sessão experimental 30 min; concorrência independente; Direct Boot no target; restore sem ARMED; retenção 30 dias/1.000 eventos; e autorização de futura missão de harness descartável. Valores experimentais não são FACT nem promessa comercial.
 
@@ -70,14 +73,15 @@ Priorizar um elemento no G2 não prova benefício.
 
 ## OPEN — condições para sair de G1 CONDITIONAL
 
-1. Fundador escolher binding de execução: repositório público autorizado, repositório privado com autorização/cap de minutos, ou runner self-hosted x86_64/KVM sem novo custo.
-2. Executar discovery no binding, congelar revisões exatas de emulator/system images, completar os dez prechecks, construir o adapter descartável e executar E1 real nas APIs 31, 34, 35, 36 e 37; E0 já passou.
-3. Escolher e obter modelos/fingerprints físicos para E2/E3; nenhuma família OEM é suportada por nome.
-4. Calibrar oráculo acústico, clocks e epsilon; escolher limite de disponibilidade de controles.
-5. Demonstrar Direct Boot real, lifecycle/foco/áudio em API 37 e contenção de dependências opcionais.
-6. Comparar mecanismo de snooze pós-reboot e arbitragem OUTPUT_OWNER/OUTPUT_WAITING sem alterar semântica decidida.
-7. Executar repetições E2–E5, resolver S0s e aprovar cada célula explicitamente.
-8. Envio remoto, máximo de snoozes, UX concorrente e retenção de artefatos laboratoriais continuam OPEN.
+1. Fundador comprovar em GitHub o plano/franquia/saldo, `PAID_OVERAGE_ALLOWED = FALSE` por hard stop de Actions e Actions habilitado para o repo privado já vinculado.
+2. Executar um único discovery run, observar KVM/runner/tooling e, somente se `LAB_DISCOVERY_PASS`, provisionar API 36 e completar P1–P10; adapter e Wave 1 continuam fora da MISSÃO 05R.
+3. Depois da aprovação do laboratório, construir o adapter descartável e executar E1 real nas APIs 31, 34, 35, 36 e 37; E0 já passou.
+4. Escolher e obter modelos/fingerprints físicos para E2/E3; nenhuma família OEM é suportada por nome.
+5. Calibrar oráculo acústico, clocks e epsilon; escolher limite de disponibilidade de controles.
+6. Demonstrar Direct Boot real, lifecycle/foco/áudio em API 37 e contenção de dependências opcionais.
+7. Comparar mecanismo de snooze pós-reboot e arbitragem OUTPUT_OWNER/OUTPUT_WAITING sem alterar semântica decidida.
+8. Executar repetições E2–E5, resolver S0s e aprovar cada célula explicitamente.
+9. Envio remoto, máximo de snoozes, UX concorrente e retenção de artefatos laboratoriais continuam OPEN.
 
 Detalhes em [OPEN-QUESTIONS.md](OPEN-QUESTIONS.md), [POLICY-FREEZE.md](docs/reliability/POLICY-FREEZE.md) e [EVIDENCE-PLAN.md](docs/reliability/EVIDENCE-PLAN.md).
 
@@ -89,10 +93,10 @@ Detalhes em [OPEN-QUESTIONS.md](OPEN-QUESTIONS.md), [POLICY-FREEZE.md](docs/reli
 
 **SCAR-G1-03:** falha de modelo revelada no E0 — estado durável e propriedade efêmera do output não podem compartilhar restauração ingênua. Após morte do processo, descartar `OUTPUT_OWNER` e converter estados em voo para `RECOVERY_REQUIRED`; histórico interno não prova áudio atual. Evidência: `EVID-G1-0002` e relatório E0.
 
-**SCAR-G1-04:** falha de prontidão laboratorial — capacidade documentada do provedor não é laboratório disponível sem repositório/runner autorizado, configuração vinculada e caminho de retorno de artefatos. Preservar `PLATFORM_CAPABILITY != EXECUTION_BINDING != PRECHECK_PASS`. Evidência: `EVID-G1-0009..0010`.
+**SCAR-G1-04:** falha de prontidão laboratorial — capacidade documentada do provedor não é laboratório disponível sem repositório/runner autorizado, configuração vinculada, guardrail financeiro comprovado e caminho de retorno de artefatos. Preservar `PLATFORM_CAPABILITY != EXECUTION_BINDING != PRECHECK_PASS`. Evidência: `EVID-G1-0009..0012`.
 
 Nenhum PATTERN ou WIN validado.
 
 ## Próxima investigação
 
-**MISSÃO 05R recomendada: AUTHORIZE AND BIND THE E1 RUNNER.** O fundador escolhe uma binding e seus limites de visibilidade/custo; então executar apenas discovery, congelar o ambiente, completar os dez prechecks e retomar a MISSÃO 05 a partir do adapter fino/API 36 Wave 1. Não iniciar E2, G2, produto, UI final ou stack de produção.
+**Continuar a MISSÃO 05R somente após o guardrail manual.** Confirmar `PAID_OVERAGE_ALLOWED = FALSE`, saldo incluído e Actions habilitado; então executar somente discovery e, se aprovado, o precheck mínimo API 36. Encerrar a missão antes do adapter/Wave 1. Não iniciar E2, G2, produto, UI final ou stack de produção.

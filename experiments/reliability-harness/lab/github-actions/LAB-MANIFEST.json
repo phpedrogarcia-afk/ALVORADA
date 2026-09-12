@@ -1,7 +1,7 @@
 {
   "schema_version": 2,
   "manifest_id": "G1.3-MISSION-05R-BINDING-20260912",
-  "status": "BINDING_BLOCKED",
+  "status": "BINDING_BLOCKED_ZERO_OVERAGE_UNCONFIRMED",
   "purpose": "Authorize and bind one zero-overage GitHub Actions E1 lab; not an E1 scenario result",
   "captured_at_utc": "2026-09-12T21:37:00Z",
   "financial_cost_incurred_usd": 0,
@@ -18,14 +18,18 @@
   },
   "repository_preflight": {
     "authenticated_owner": "phpedrogarcia-afk",
-    "accessible_repositories_inspected": 7,
-    "appropriate_existing_alvorada_repository_observed": false,
+    "accessible_repositories_inspected": 8,
+    "appropriate_existing_alvorada_repository_observed": true,
     "overwrite_risk_observed": false,
-    "repository_created": false,
-    "repository_url": null,
-    "actions_enabled": "UNKNOWN_REPOSITORY_NOT_CREATED",
-    "execution_binding": "BLOCKED",
-    "blocking_reason": "No authorized operation available to create the repository; no GitHub CLI or task-scoped token is configured"
+    "repository_created": true,
+    "repository_url": "https://github.com/phpedrogarcia-afk/ALVORADA",
+    "visibility_observed": "PRIVATE",
+    "admin_and_push_permission_observed": true,
+    "actions_enabled": "UNKNOWN_POLICY_NOT_INDEPENDENTLY_OBSERVED",
+    "root_workflow_present": true,
+    "root_workflow_blob": "0f48cf3a4530f963a3e986415847a101d88069d5",
+    "execution_binding": "PASS_REPOSITORY_SNAPSHOT",
+    "blocking_reason": "Repository is bound, but Actions enablement, remaining included minutes, and the paid-overage hard stop are not proven"
   },
   "zero_overage_guardrail": {
     "goal": "PAID_OVERAGE_ALLOWED=FALSE",
@@ -43,14 +47,35 @@
     "e0_baseline_commit": "06a8cbbc2b75e9b2e415f87574b5a1307b524d8b",
     "mission05_discovery_package_commit": "c0ac4775833266b10ce486d146aa7013f74a5d1a",
     "both_commits_present_in_local_harness_history": true,
-    "canonical_remote_commit": null,
-    "migration_performed": false,
-    "migration_map_required": false,
-    "provenance_status": "LOCAL_LINEAGE_PRESERVED_REMOTE_BINDING_NOT_PERFORMED"
+    "latest_local_harness_commit": "0bb5e6cfcd571dc90d36f12830fb44a2de7de9e5",
+    "canonical_import_commit": "68769e9337fae4f301a31d76a92dce5c287f841b",
+    "canonical_import_tree": "00bf5c9badfdaca0d6a41189f5689e0bcfcfc567",
+    "migration_performed": true,
+    "migration_map_required": true,
+    "migration_evidence": "evidence/g1/raw-mission05r/repository-binding.md",
+    "provenance_status": "SNAPSHOT_BOUND_OLD_SHAS_TRACEABLE_NOT_REMOTE_ANCESTORS",
+    "migration_map": [
+      {
+        "old_commit": "06a8cbbc2b75e9b2e415f87574b5a1307b524d8b",
+        "new_commit": "68769e9337fae4f301a31d76a92dce5c287f841b",
+        "content_equivalence_method": "TRACEABILITY_ONLY_E0_ARTIFACTS_AND_CHECKSUMS_IMPORTED_NO_TREE_EQUIVALENCE_CLAIM"
+      },
+      {
+        "old_commit": "c0ac4775833266b10ce486d146aa7013f74a5d1a",
+        "new_commit": "68769e9337fae4f301a31d76a92dce5c287f841b",
+        "content_equivalence_method": "TRACEABILITY_ONLY_DISCOVERY_PACKAGE_IMPORTED_NO_COMMIT_IDENTITY_CLAIM"
+      },
+      {
+        "old_commit": "0bb5e6cfcd571dc90d36f12830fb44a2de7de9e5",
+        "new_commit": "68769e9337fae4f301a31d76a92dce5c287f841b",
+        "content_equivalence_method": "53_FILE_SNAPSHOT_IMPORT_KEY_FILES_FETCHED_BACK_FULL_CLONE_AUDIT_PENDING"
+      }
+    ]
   },
   "discovery": {
     "workflow_path": ".github/workflows/e1-lab-discovery.yml",
     "workflow_exists_locally": true,
+    "workflow_blob": "0f48cf3a4530f963a3e986415847a101d88069d5",
     "workflow_run_id": null,
     "runner_image": null,
     "runner_os": null,
@@ -61,10 +86,10 @@
     "android_sdk_available": "UNKNOWN_NOT_RUN",
     "emulator_installable": "UNKNOWN_NOT_RUN",
     "avd_creation_possible": "UNKNOWN_NOT_RUN",
-    "classification": "NOT_RUN_BINDING_BLOCKED"
+    "classification": "NOT_RUN_ZERO_OVERAGE_GUARDRAIL_UNCONFIRMED"
   },
   "api36_precheck": {
-    "classification": "NOT_RUN_BINDING_BLOCKED",
+    "classification": "NOT_RUN_ZERO_OVERAGE_GUARDRAIL_UNCONFIRMED",
     "cmdline_tools_revision": null,
     "platform_tools_revision": null,
     "emulator_revision": null,
@@ -118,7 +143,7 @@
     "reliability_adapter_allowed": false,
     "e1_wave1_allowed": false,
     "ready_for_e1_wave1": false,
-    "reason": "EXECUTION_BINDING and zero-overage hard stop are not proven; P1-P10 are UNKNOWN"
+    "reason": "Repository snapshot is bound, but Actions enablement and zero-overage hard stop are not proven; P1-P10 are UNKNOWN"
   },
   "sources": [
     "https://docs.github.com/billing/managing-billing-for-github-actions/about-billing-for-github-actions",
