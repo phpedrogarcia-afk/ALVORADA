@@ -133,10 +133,21 @@ jobs:
           printf 'KVM_AFTER_WRITABLE=%s\n' "$kvm_after_writable"
 
           emulator_install_attempted=NO
+          emulator_install_reason=NOT_NEEDED
           emulator_install_exit_code=NOT_RUN
           emulator_license_blocked=NO
-          if [ "$sdkmanager_location" != NOT_FOUND ] && [ "$kvm_after_readable" = YES ] && [ "$kvm_after_writable" = YES ]; then
+          if [ "$emulator_present_before" = YES ]; then
+            emulator_install_reason=SKIPPED_ALREADY_PRESENT
+            emulator_install_exit_code=NOT_RUN_ALREADY_PRESENT
+          elif [ "$sdkmanager_location" = NOT_FOUND ]; then
+            emulator_install_reason=SKIPPED_SDKMANAGER_NOT_FOUND
+            emulator_install_exit_code=NOT_RUN_SDKMANAGER_NOT_FOUND
+          elif [ "$kvm_after_readable" != YES ] || [ "$kvm_after_writable" != YES ]; then
+            emulator_install_reason=SKIPPED_KVM_NOT_RW
+            emulator_install_exit_code=NOT_RUN_KVM_NOT_RW
+          else
             emulator_install_attempted=YES
+            emulator_install_reason=EMULATOR_ABSENT_AND_PREREQUISITES_READY
             "$sdkmanager_location" "emulator" </dev/null 2>&1 | tee "$install_output"
             emulator_install_exit_code=${PIPESTATUS[0]}
             if [ "$emulator_install_exit_code" -ne 0 ] && grep -Eqi 'license.*(not accepted|not been accepted)|accept.*license' "$install_output"; then
@@ -144,6 +155,7 @@ jobs:
             fi
           fi
           printf 'EMULATOR_INSTALL_ATTEMPTED=%s\n' "$emulator_install_attempted"
+          printf 'EMULATOR_INSTALL_REASON=%s\n' "$emulator_install_reason"
           printf 'EMULATOR_INSTALL_EXIT_CODE=%s\n' "$emulator_install_exit_code"
           printf 'EMULATOR_LICENSE_BLOCKED=%s\n' "$emulator_license_blocked"
 
@@ -156,6 +168,14 @@ jobs:
           fi
           printf 'EMULATOR_PRESENT_AFTER=%s\n' "$emulator_present_after"
           printf 'EMULATOR_LOCATION_AFTER=%s\n' "$emulator_location_after"
+
+          emulator_source=NOT_AVAILABLE
+          if [ "$emulator_present_before" = YES ] && [ "$emulator_present_after" = YES ]; then
+            emulator_source=PREEXISTING
+          elif [ "$emulator_present_before" = NO ] && [ "$emulator_install_attempted" = YES ] && [ "$emulator_install_exit_code" -eq 0 ] && [ "$emulator_present_after" = YES ]; then
+            emulator_source=INSTALLED_BY_PROBE
+          fi
+          printf 'EMULATOR_SOURCE=%s\n' "$emulator_source"
 
           emulator_version_exit_code=NOT_RUN
           if [ "$emulator_present_after" = YES ]; then
@@ -184,22 +204,26 @@ jobs:
           printf 'EMULATOR_ACCEL_CHECK=%s\n' "$emulator_accel_check"
           printf 'EMULATOR_ACCEL_CHECK_EXIT_CODE=%s\n' "$emulator_accel_check_exit_code"
 
-          if [ "$sdkmanager_location" = NOT_FOUND ]; then
+          if [ "$emulator_present_before" = NO ] && [ "$sdkmanager_location" = NOT_FOUND ]; then
             classification=SDKMANAGER_NOT_FOUND
           elif [ "$kvm_device_present" != YES ] || [ "$kvm_after_readable" != YES ] || [ "$kvm_after_writable" != YES ]; then
             classification=KVM_REMEDIATION_FAILED
           elif [ "$emulator_license_blocked" = YES ]; then
             classification=EMULATOR_LICENSE_BLOCKED
-          elif [ "$emulator_install_attempted" != YES ] || [ "$emulator_install_exit_code" -ne 0 ]; then
+          elif [ "$emulator_present_before" = NO ] && { [ "$emulator_install_attempted" != YES ] || [ "$emulator_install_exit_code" -ne 0 ]; }; then
             classification=EMULATOR_INSTALL_FAILED
+          elif [ "$emulator_present_after" != YES ] && [ "$emulator_present_before" = YES ]; then
+            classification=EMULATOR_BINARY_NOT_FOUND_AFTER_PRECHECK
           elif [ "$emulator_present_after" != YES ]; then
             classification=EMULATOR_BINARY_NOT_FOUND_AFTER_INSTALL
           elif [ "$emulator_version_exit_code" -ne 0 ]; then
             classification=EMULATOR_VERSION_CHECK_FAILED
           elif [ "$emulator_accel_check" != PASS ]; then
             classification=EMULATOR_ACCELERATION_FAILED
-          else
+          elif [ "$emulator_source" = PREEXISTING ] || [ "$emulator_source" = INSTALLED_BY_PROBE ]; then
             classification=EMULATOR_PROVISION_PASS
+          else
+            classification=EMULATOR_SOURCE_UNRESOLVED
           fi
 
           printf 'EMULATOR_PROVISION_CLASSIFICATION=%s\n' "$classification"

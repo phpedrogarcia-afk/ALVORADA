@@ -259,6 +259,23 @@
     "avd_creation": "PROHIBITED_IN_THIS_PROBE",
     "global_license_acceptance": "PROHIBITED",
     "artifact_policy": "SMALL_TEXT_LOG_ONLY_RETENTION_1_DAY",
-    "ready_for_e1_wave1": false
+    "ready_for_e1_wave1": false,
+    "install_policy": "SKIP_INSTALL_WHEN_EMULATOR_PRESENT_BEFORE",
+    "acceptable_usable_sources": [
+      "PREEXISTING_USABLE",
+      "INSTALLED_BY_PROBE_USABLE"
+    ],
+    "emulator_source_values": [
+      "PREEXISTING",
+      "INSTALLED_BY_PROBE",
+      "NOT_AVAILABLE"
+    ],
+    "pass_requires": [
+      "sdkmanager available when installation is necessary",
+      "emulator present after the provisioning step",
+      "emulator -version exits 0",
+      "KVM readable and writable after optional ephemeral remediation",
+      "emulator -accel-check passes"
+    ]
   }
 }
