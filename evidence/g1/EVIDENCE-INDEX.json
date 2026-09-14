@@ -380,6 +380,110 @@
         "MISSÃO 05R / EVIDENCE PROVENANCE CHECK",
         "MISSÃO 05R / ZERO-COST GUARDRAIL"
       ]
+    },
+    {
+      "evidence_id": "EVID-G1-0013",
+      "evidence_level": "PUBLICATION_SECURITY_AND_HISTORY_SANITIZATION_AUDIT",
+      "device_or_emulator": "NONE",
+      "api": null,
+      "build_fingerprint": null,
+      "scenario": "SANITIZE_REACHABLE_CANONICAL_HISTORY_AND_AUDIT_PUBLICATION_STATE",
+      "scheduling_strategy": "NOT_REACHED",
+      "preconditions": "Public canonical repository main at e78c80365ab0345247704f5a27fe9fa80f096652; four rewritten commits have tree-equivalent technical content",
+      "permission_state": "Public repository, reachable history, commit metadata and Actions page observed; external clones, caches and unreachable object storage are not observable",
+      "scheduled_time": null,
+      "captured_at_utc": "2026-09-14T11:46:19Z",
+      "repository": {
+        "repository_full_name": "phpedrogarcia-afk/ALVORADA",
+        "visibility": "public",
+        "canonical_head": "e78c80365ab0345247704f5a27fe9fa80f096652",
+        "actions_enabled": true,
+        "workflow_runs": 0
+      },
+      "event_timeline": [
+        "Sanitize author and committer e-mail metadata in the canonical history",
+        "Verify the four rewritten commits preserve their corresponding technical trees",
+        "Audit reachable canonical history for personal e-mail, tokens, API keys, private keys, credentials, authenticated URLs, .env and relevant secrets patterns",
+        "Record NO_MATCH_FOUND for the searched scope rather than asserting global absence",
+        "Confirm the public repository exposes Actions and no workflow has run"
+      ],
+      "metrics": {
+        "rewritten_commit_pairs": 4,
+        "tree_equivalence_pairs_verified": 4,
+        "workflow_runs": 0,
+        "actions_minutes_consumed_by_mission": 0,
+        "financial_cost_usd": 0
+      },
+      "history_sanitization_map": [
+        {
+          "old_commit": "d415bc4ed0cc1d128e68505b0c7f306725dae2e1",
+          "new_commit": "2455a4e27f2da2445ef659c22a6835a5765c6f1f"
+        },
+        {
+          "old_commit": "68769e9337fae4f301a31d76a92dce5c287f841b",
+          "new_commit": "14c7cab6f4fede34176cfb613266714066e85676"
+        },
+        {
+          "old_commit": "ac33add8ca8d9b872b328e9ea1400e30220e59de",
+          "new_commit": "dce294ad412f12ae95615dfe4b49e1588d1a1fb6"
+        },
+        {
+          "old_commit": "8bf4966ac11ba645cbd0e99972f1148e4f56590a",
+          "new_commit": "e78c80365ab0345247704f5a27fe9fa80f096652"
+        }
+      ],
+      "result": "PASS_WITH_CAVEAT",
+      "severity": null,
+      "raw_log_reference": "FOUNDER_REPORTED_PUBLICATION_SECURITY_AUDIT",
+      "artifact_sha256": null,
+      "related_contract_clause": [
+        "D-G1-LAB-02",
+        "SCAR-G1-05",
+        "PUBLICATION_SECURITY_CHECK"
+      ],
+      "claim_envelope": "The reachable canonical history and queried publication surfaces were audited. This does not prove removal from pre-existing clones, caches or unreachable object storage."
+    },
+    {
+      "evidence_id": "EVID-G1-0014",
+      "evidence_level": "PUBLICATION_ROUTE_FAILURE_AND_CONTAINMENT",
+      "device_or_emulator": "NONE",
+      "api": null,
+      "build_fingerprint": null,
+      "scenario": "CONTAIN_EXTERNAL_PUBLICATION_ROUTE_WITH_NONCOMPLIANT_GIT_METADATA",
+      "scheduling_strategy": "NOT_REACHED",
+      "preconditions": "Canonical publication requires noreply author and committer metadata; no E1 discovery may run before publication state is safe",
+      "permission_state": "Publication route behavior and canonical main state observed; external caches and object retention are not observable",
+      "scheduled_time": null,
+      "captured_at_utc": "2026-09-14T11:46:19Z",
+      "repository": {
+        "repository_full_name": "phpedrogarcia-afk/ALVORADA",
+        "canonical_head_after_containment": "e78c80365ab0345247704f5a27fe9fa80f096652",
+        "unapproved_commit_reachable_from_main_after_containment": false,
+        "workflow_runs": 0
+      },
+      "event_timeline": [
+        "An external publication route materialized a commit with metadata outside the noreply policy",
+        "Contain the route by removing that commit from canonical main immediately",
+        "Restore canonical main to the sanitized head",
+        "Prohibit this route for canonical publication and require Git-local metadata verification",
+        "Stop before workflow dispatch, discovery, Wave 1, E2 or G2"
+      ],
+      "metrics": {
+        "workflow_runs": 0,
+        "scenario_executions": 0,
+        "p1_p10_unknown_count": 10,
+        "financial_cost_usd": 0
+      },
+      "result": "CONTAINED",
+      "severity": "S2_PUBLICATION_METADATA",
+      "raw_log_reference": "FOUNDER_REPORTED_PUBLICATION_ROUTE_CONTAINMENT",
+      "artifact_sha256": null,
+      "related_contract_clause": [
+        "D-G1-LAB-02",
+        "SCAR-G1-06",
+        "PUBLICATION_SECURITY_CHECK"
+      ],
+      "claim_envelope": "The noncompliant commit was removed from canonical main. This does not prove deletion from external caches, clones or unreachable object storage."
     }
   ]
 }

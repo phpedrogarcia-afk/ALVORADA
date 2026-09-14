@@ -1,7 +1,7 @@
 # DECISIONS LEDGER
 
 **Projeto:** ALVORADA — codinome provisório  
-**Atualizado em:** 2026-09-12
+**Atualizado em:** 2026-09-14
 
 O ledger registra escolhas reais, não ideias plausíveis. Uma hipótese permanece no `SOURCE-OF-TRUTH.md` ou uma incerteza no `OPEN-QUESTIONS.md` até existir decisão consciente.
 
@@ -472,7 +472,7 @@ Data de registro: 2026-09-11. Todas são políticas para investigação; não s�
 ### D-G1-LAB-01 — Binding privado e zero-overage
 
 - **data:** 2026-09-12
-- **status:** ACCEPTED
+- **status:** SUPERSEDED
 - **contexto:** GitHub-hosted Linux era capacidade documentada, mas ALVORADA não possuía binding executável.
 - **decisão:** Usar um único repositório privado canônico `ALVORADA`, GitHub Actions como laboratório E1 primário, runner standard `ubuntu-24.04`, somente minutos incluídos e `PAID_OVERAGE_ALLOWED = FALSE`.
 - **alternativas consideradas:** Repo público, vários repos, larger runner pago, infraestrutura paga externa e self-hosted; não escolhidos nesta missão.
@@ -480,7 +480,20 @@ Data de registro: 2026-09-11. Todas são políticas para investigação; não s�
 - **evidência:** Decisão do fundador na MISSÃO 05R; repo privado e snapshot confirmados em `EVID-G1-0012`.
 - **consequências:** Discovery só pode rodar após hard stop de overage, saldo e Actions habilitado serem observados; adapter/Wave 1 continuam fora da missão.
 - **reversibilidade:** Média no provedor/runner; baixa na proibição de cobrança silenciosa.
-- **condição para reabrir:** GitHub-hosted standard provar-se inviável, franquia insuficiente ou risco de custo/privacidade exigir nova decisão explícita.
+- **condição para reabrir:** Superada por `D-G1-LAB-02` após a sanitização do histórico e a confirmação de que o repositório canônico é público. O registro permanece como proveniência; não governa a execução atual.
+
+### D-G1-LAB-02 — Repositório público e runner standard GitHub-hosted
+
+- **data:** 2026-09-14
+- **status:** ACCEPTED
+- **contexto:** O histórico canônico foi sanitizado e o repositório `phpedrogarcia-afk/ALVORADA` é público, com Actions habilitado e zero runs. O bloqueio de franquia/overage específico do binding privado deixou de descrever a rota selecionada.
+- **decisão:** Manter um único repositório público canônico `ALVORADA` e usar GitHub Actions standard GitHub-hosted `ubuntu-24.04` para o discovery E1. Larger runners, infraestrutura paga externa, serviços pagos e qualquer expansão financeira permanecem proibidos. Artefatos/cache devem ser mínimos, reter por somente 1 dia e nunca armazenar SDK, system images ou AVDs.
+- **alternativas consideradas:** Retomar o binding privado de `D-G1-LAB-01`, fragmentar em vários repositórios, usar larger runners, infraestrutura paga externa ou self-hosted; rejeitados para esta missão.
+- **racional:** Eliminar o blocker obsoleto do repo privado sem ampliar escopo, custo autorizado ou a superfície de retenção pública.
+- **evidência:** Decisão do fundador; `EVID-G1-0013` registra a sanitização/auditoria e `EVID-G1-0014` registra a contenção da rota de publicação incompatível com a política noreply.
+- **consequências:** Após a publicação verificável desta correção, a próxima e única ação remota permitida é um discovery. Runner real, KVM, Android SDK/emulator/AVD e P1–P10 permanecem `UNKNOWN`; adapter, Wave 1, E2 e G2 continuam fora da missão.
+- **reversibilidade:** Média no provedor/runner; baixa na proibição de recursos pagos e na minimização de artefatos.
+- **condição para reabrir:** Evidência de indisponibilidade do runner standard, mudança material de privacidade/custo ou necessidade comprovada que exija autorização explícita posterior.
 
 ## Propostas G1 que ainda NÃO são decisões aceitas
 

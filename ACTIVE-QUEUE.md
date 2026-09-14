@@ -1,7 +1,7 @@
 # ACTIVE QUEUE
 
 **Projeto:** ALVORADA — codinome provisório  
-**Atualizado em:** 2026-09-12
+**Atualizado em:** 2026-09-14
 
 Esta é uma fila de gates de conhecimento, não um roadmap de features nem um cronograma. Um gate só abre após aprovação do anterior e pode mandar o projeto voltar, reduzir escopo ou encerrar uma hipótese.
 
@@ -17,15 +17,15 @@ Esta é uma fila de gates de conhecimento, não um roadmap de features nem um cr
 
 ## G1 — RELIABILITY
 
-**Estado:** CONDITIONAL — G1.1 PASS; G1.2 `E0_PASS`; G1.3 / MISSÃO 05R `BINDING_BLOCKED_ZERO_OVERAGE_UNCONFIRMED`. Repo privado e snapshot vinculados; nenhum run, precheck, envelope Android ou físico validado.
+**Estado:** CONDITIONAL — G1.1 PASS; G1.2 `E0_PASS`; G1.3 / MISSÃO 05R `PUBLIC_BINDING_READY_DISCOVERY_NOT_RUN`. Repo público, Actions e snapshot vinculados; nenhum run, precheck, envelope Android ou físico validado.
 
 - **Objetivo:** transformar “o alarme vem primeiro” em contrato verificável e arquitetura conceitual de contenção de falhas.
 - **Entrada:** G0 aprovado; HI-01 a HI-06; OQ-REL-01, OQ-REL-02 e OQ-AND-01 priorizadas.
 - **Saída:** condições suportadas e não suportadas; modelo de estados do alarme; matriz de falhas e recuperação; fronteira entre núcleo e camadas opcionais; métricas e protocolo de teste; riscos e evidências ainda ausentes.
 - **Evidência documental produzida:** nove documentos em `docs/reliability/`, pesquisa oficial até API 37, 56 cenários, 15 protocolos, policy freeze e plano E0–E5.
-- **Evidência instrumentada produzida:** harness JVM descartável `0.1.0`; baseline E0 no SHA `06a8cbbc2b75e9b2e415f87574b5a1307b524d8b` passou 82 testes/100.000 sequências (`EVID-G1-0002..0003`). Repo privado `phpedrogarcia-afk/ALVORADA` recebeu snapshot de 53 arquivos no import commit `68769e9337fae4f301a31d76a92dce5c287f841b`, com migration map explícito; E1 executou zero cenários (`EVID-G1-0004..0012`).
+- **Evidência instrumentada produzida:** harness JVM descartável `0.1.0`; baseline E0 no SHA `06a8cbbc2b75e9b2e415f87574b5a1307b524d8b` passou 82 testes/100.000 sequências (`EVID-G1-0002..0003`). O repo público `phpedrogarcia-afk/ALVORADA` preserva o snapshot de 53 arquivos com mapa explícito de migração/sanitização; a auditoria de publicação e a contenção da rota externa estão em `EVID-G1-0013..0014`. E1 executou zero cenários (`EVID-G1-0004..0014`).
 - **Políticas fechadas:** API 31+ candidata; hora civil e DST; late 10 min; bandas 2/5 s e 1/3 s; soneca 5 min; dismiss; sessão 30 min; concorrência independente; Direct Boot; restore e retenção 30 dias/1.000 eventos.
-- **Condições restantes para PASS:** comprovar hard stop de overage, saldo incluído e Actions habilitado; executar discovery; se passar, congelar revisões e completar o precheck mínimo API 36; só em missão posterior compilar adapter Android e iniciar Wave 1. Depois executar E1 completa, E2–E5, calibrar áudio/epsilon, selecionar células físicas, resolver mecanismos experimentais e aprovar cada célula. Conjunto validado permanece vazio.
+- **Condições restantes para PASS:** aplicar/publicar a correção de binding por Git local com metadados noreply verificáveis; executar um único discovery; se passar, congelar revisões e completar o precheck mínimo API 36; só em missão posterior compilar adapter Android e iniciar Wave 1. Depois executar E1 completa, E2–E5, calibrar áudio/epsilon, selecionar células físicas, resolver mecanismos experimentais e aprovar cada célula. Conjunto validado permanece vazio.
 - **Critério de aprovação:** cada modo crítico conhecido tem comportamento esperado e teste proposto; nenhuma camada opcional aparece no caminho crítico; alegações de confiabilidade têm escopo e limiar explícitos; decisões de plataforma são registradas sem escolher stack por conveniência.
 - **Não fazer ainda:** implementar o aplicativo, selecionar framework, polir áudio ou UI, conectar clima/calendário, gerar conteúdo ou prometer confiabilidade universal.
 
@@ -62,4 +62,4 @@ Esta é uma fila de gates de conhecimento, não um roadmap de features nem um cr
 
 ## Próxima ação autorizada
 
-MISSÃO 05R está **`BINDING_BLOCKED_ZERO_OVERAGE_UNCONFIRMED`**, custo USD 0 e zero execuções E1. O repo privado e o snapshot estão vinculados; falta o fundador confirmar no GitHub o hard stop `PAID_OVERAGE_ALLOWED = FALSE`, saldo incluído e Actions habilitado. Depois, continuar a mesma missão com apenas discovery e, se aprovado, precheck mínimo API 36. Não iniciar Wave 1, E2, G2, app de produto, UI final, stack de produção ou suporte físico.
+MISSÃO 05R está **`PUBLIC_BINDING_READY_DISCOVERY_NOT_RUN`**, custo USD 0 e zero execuções E1. O repo público, Actions e o snapshot estão vinculados; publicar esta correção somente por Git local com metadados noreply verificáveis. Depois, continuar a mesma missão com apenas um discovery e, se aprovado, precheck mínimo API 36. Não iniciar Wave 1, E2, G2, app de produto, UI final, stack de produção ou suporte físico.

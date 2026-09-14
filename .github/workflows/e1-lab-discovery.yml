@@ -39,4 +39,4 @@ jobs:
           name: e1-lab-discovery-${{ github.sha }}-${{ github.run_id }}
           path: experiments/reliability-harness/e1-lab-discovery.log
           if-no-files-found: error
-          retention-days: 30
+          retention-days: 1

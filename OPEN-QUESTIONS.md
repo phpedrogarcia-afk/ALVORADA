@@ -1,7 +1,7 @@
 # OPEN QUESTIONS
 
 **Projeto:** ALVORADA — codinome provisório  
-**Atualizado em:** 2026-09-12
+**Atualizado em:** 2026-09-14
 
 Prioridade indica risco de aprender tarde: **P0** bloqueia o gate indicado; **P1** bloqueia uma decisão próxima; **P2** pode esperar sem contaminar o trabalho atual. Uma questão só é encerrada por evidência identificável e decisão quando necessária.
 
@@ -38,11 +38,11 @@ Prioridade indica risco de aprender tarde: **P0** bloqueia o gate indicado; **P1
 | OQ-G1-06 | P0 / RELIABILITY | Qual disponibilidade de hardware, aquisição acústica e limite de UNKNOWN cabem em E2–E5? | G1 eternamente documental ou dossiê inconclusivo | Inventário/ orçamento + calibração + pré-registro | Antes de E2; não bloqueia E0/E1 |
 | OQ-G1-07 | P0 / CONTEXT | Preparador pode bloquear core por CPU, lock, decoder ou inicialização? | Dependência opcional indireta no disparo | T10/T12, fronteira de contenção demonstrada | Antes de qualificar núcleo enriquecido |
 | OQ-G1-08 | P0 / RELIABILITY | Qual latência torna dismiss/snooze realmente disponível em cada superfície? | Áudio sem controle prático apesar de botão renderizado | Medição externa T04/T09 e teste operacional; fixar L_controls pré-aceitação | E1 caracteriza; antes de E2 PASS |
-| OQ-G1-09 | P0 / ANDROID | O repo privado está vinculado; o runner standard `ubuntu-24.04` realmente fornece KVM, SDK/emulator instalável, imagem API 36, AVD, adb e persistência de artefatos dentro de zero-overage? | Confundir binding com laboratório aprovado ou incorrer custo não autorizado | Hard stop/saldo/Actions observados + discovery real + precheck API 36 P1–P10 | Continuação da MISSÃO 05R; bloqueia todo E1 |
+| OQ-G1-09 | P0 / ANDROID | O repo público está vinculado; o runner standard `ubuntu-24.04` realmente fornece KVM, SDK/emulator instalável, imagem API 36, AVD, adb e persistência mínima de artefatos? | Confundir binding público com laboratório aprovado ou reter insumos indevidos | Um discovery real + precheck API 36 P1–P10; artefato de log com retenção de 1 dia | Continuação da MISSÃO 05R; bloqueia todo E1 |
 
 H-AUDIENCE-01 define recrutamento inicial, não resolve validação de OQ-PROD-01. Local-first está decidido; fluxos pessoais adicionais e envio remoto continuam abertos.
 
-**OQ-G1-10 resolvida em 2026-09-12:** o fundador escolheu repo privado canônico, GitHub Actions, runner standard `ubuntu-24.04` e zero-overage. Registro: `D-G1-LAB-01`; execução financeira continua condicionada por OQ-G1-09.
+**OQ-G1-10 resolvida em 2026-09-14:** `D-G1-LAB-01` foi superada. O fundador escolheu o repo público canônico, GitHub Actions standard `ubuntu-24.04`, proibição de recursos pagos e artefato mínimo com retenção de 1 dia. Registro: `D-G1-LAB-02`; a disponibilidade real do laboratório continua em `OQ-G1-09`.
 
 ## Regra de contenção
 

@@ -1,7 +1,7 @@
 # SOURCE OF TRUTH
 
-**Snapshot:** 2026-09-12 · **ALVORADA: codinome**  
-**G0: PASS. G1: CONDITIONAL. G1.1: PASS. G1.2: E0_PASS. G1.3 / MISSÃO 05R: BINDING_BLOCKED_ZERO_OVERAGE_UNCONFIRMED.** `REPOSITORY_BINDING = PASS`, mas `LAB_DISCOVERY = NOT_RUN`, P1–P10 = `UNKNOWN` e `READY_FOR_E1_WAVE1 = NO`; envelope validado vazio. G2 não liberado.
+**Snapshot:** 2026-09-14 · **ALVORADA: codinome**
+**G0: PASS. G1: CONDITIONAL. G1.1: PASS. G1.2: E0_PASS. G1.3 / MISSÃO 05R: PUBLIC_BINDING_READY_DISCOVERY_NOT_RUN.** `REPOSITORY_BINDING = PASS` e `PUBLICATION_SECURITY_CHECK = PASS_WITH_CAVEAT`; `LAB_DISCOVERY = NOT_RUN`, P1–P10 = `UNKNOWN` e `READY_FOR_E1_WAVE1 = NO`; envelope validado vazio. G2 não liberado.
 
 ## Visão atual
 
@@ -25,8 +25,10 @@ Despertar sereno e eficaz, alarme primeiro, contexto seletivo e local-first. And
 | F-012 | FACT-DOC / FACT-EVID | O setup oficial classifica API 37 no canal Preview; localmente API 37 está indisponível | Android 17 setup; `EVID-G1-0008` |
 | F-013 | FACT-DOC | Em 2026-09-12: Play exige target API 36+ para novos apps/updates; API 37 segue Preview; alarm/timer segue uso legítimo e restrito de exact alarm | Fontes oficiais revalidadas em `EVID-G1-0010` |
 | F-014 | FACT-EVID histórico | Na MISSÃO 05, GitHub-hosted Linux tinha aceleração Android documentada, mas o projeto ainda não possuía repo/runner autorizado; capacidade de CI não era binding executável | `EVID-G1-0009..0010`; sete repos então inspecionados, zero ALVORADA |
-| F-015 | FACT-EVID | O fundador criou `phpedrogarcia-afk/ALVORADA`; repo privado/admin confirmado e snapshot Foundation+G1+harness+evidências vinculado no import commit `68769e9337fae4f301a31d76a92dce5c287f841b` | `EVID-G1-0012`; 53 arquivos, workflow manual presente |
-| F-016 | FACT-EVID | Plano, franquia/consumo de Actions, hard stop de overage e habilitação de Actions por política não são observáveis pelo canal atual; nenhum workflow rodou e custo = USD 0 | `EVID-G1-0011..0012`; P1–P10 `UNKNOWN` |
+| F-015 | FACT-EVID | `phpedrogarcia-afk/ALVORADA` é público; o histórico canônico foi sanitizado para o HEAD `e78c80365ab0345247704f5a27fe9fa80f096652` sem alteração das trees técnicas correspondentes. O snapshot Foundation+G1+harness+evidências permanece rastreável a partir da importação histórica de 53 arquivos | `EVID-G1-0012..0013`; SHAs pré-sanitização permanecem somente como proveniência |
+| F-016 | FACT-EVID | Actions está habilitado no repo público, o workflow manual está visível e nenhum workflow rodou; custo da missão = USD 0. Runner real, `/dev/kvm`, SDK/emulator/AVD e P1–P10 continuam não observados | `EVID-G1-0013`; `LAB_DISCOVERY = NOT_RUN` |
+| F-017 | FACT-EVID / limite de inferência | A auditoria do histórico canônico alcançável não encontrou os padrões pesquisados de e-mail pessoal, tokens, chaves, credenciais, URLs autenticadas, `.env` ou secrets. Isso é `NO_MATCH_FOUND`, não prova de ausência global; clones, caches e objetos fora do histórico alcançável podem persistir | `EVID-G1-0013`; `PUBLICATION_SECURITY_CHECK = PASS_WITH_CAVEAT` |
+| F-018 | FACT-EVID | Uma rota de publicação externa materializou um commit com metadados fora da política noreply; o commit foi retirado imediatamente de `main`, que voltou ao HEAD sanitizado. A rota não deve ser usada para publicação canônica | `EVID-G1-0014`; nenhum discovery ou cenário E1 foi executado |
 
 FACTs documentais Android, APIs, URLs, confiança e divergências estão em [ANDROID-RELIABILITY-RESEARCH.md](docs/reliability/ANDROID-RELIABILITY-RESEARCH.md), não duplicados aqui.
 
@@ -43,7 +45,8 @@ D-001–D-012 continuam vigentes no ledger: centro estreito, codinome, prioridad
 | D-EXPERIENCE-CORE-01 | G2 prioriza paisagem sonora, voz serena, nome, hora, mensagem breve e Escalada Serena; visual apoia; mascote não obrigatório |
 | D-G1-READINESS-01 | Ausência de capacidade essencial deve ser explícita; intenção salva não é alarme confiável armado |
 | D-G1-TELEMETRY-01 | Telemetria mínima local primeiro; envio remoto permanece OPEN |
-| D-G1-LAB-01 | Para a MISSÃO 05R: um repo privado canônico `ALVORADA`, GitHub Actions, runner standard `ubuntu-24.04`, somente minutos incluídos e nenhum overage pago |
+| D-G1-LAB-01 | **SUPERSEDED.** Binding privado e zero-overage preservado como decisão histórica; não governa mais o laboratório público atual |
+| D-G1-LAB-02 | Repo público canônico `ALVORADA`, GitHub Actions standard GitHub-hosted `ubuntu-24.04`; larger runners, infraestrutura e serviços pagos seguem proibidos. Artefatos devem ser mínimos, reter somente 1 dia e nunca incluir SDK, system images ou AVDs |
 
 F-03-01–F-03-15 também estão ACCEPTED no ledger: investigar API 31+; hora civil/fuso; gap/fold; late recovery de 10 min; bandas 2/5 s e 1/3 s; soneca 5 min; dismiss occurrence-scoped; sessão experimental 30 min; concorrência independente; Direct Boot no target; restore sem ARMED; retenção 30 dias/1.000 eventos; e autorização de futura missão de harness descartável. Valores experimentais não são FACT nem promessa comercial.
 
@@ -73,7 +76,7 @@ Priorizar um elemento no G2 não prova benefício.
 
 ## OPEN — condições para sair de G1 CONDITIONAL
 
-1. Fundador comprovar em GitHub o plano/franquia/saldo, `PAID_OVERAGE_ALLOWED = FALSE` por hard stop de Actions e Actions habilitado para o repo privado já vinculado.
+1. Aplicar e publicar a correção de binding via Git local com metadados noreply verificáveis; não usar a rota externa que materializa commits fora dessa política.
 2. Executar um único discovery run, observar KVM/runner/tooling e, somente se `LAB_DISCOVERY_PASS`, provisionar API 36 e completar P1–P10; adapter e Wave 1 continuam fora da MISSÃO 05R.
 3. Depois da aprovação do laboratório, construir o adapter descartável e executar E1 real nas APIs 31, 34, 35, 36 e 37; E0 já passou.
 4. Escolher e obter modelos/fingerprints físicos para E2/E3; nenhuma família OEM é suportada por nome.
@@ -95,8 +98,12 @@ Detalhes em [OPEN-QUESTIONS.md](OPEN-QUESTIONS.md), [POLICY-FREEZE.md](docs/reli
 
 **SCAR-G1-04:** falha de prontidão laboratorial — capacidade documentada do provedor não é laboratório disponível sem repositório/runner autorizado, configuração vinculada, guardrail financeiro comprovado e caminho de retorno de artefatos. Preservar `PLATFORM_CAPABILITY != EXECUTION_BINDING != PRECHECK_PASS`. Evidência: `EVID-G1-0009..0012`.
 
+**SCAR-G1-05:** publicação de repositório — revisar a working tree não basta antes de expor um repositório: auditar também histórico alcançável e metadados Git. Registrar o escopo da busca como `NO_MATCH_FOUND`, sem alegar remoção global de clones, caches ou objetos anteriores. Evidência: `EVID-G1-0013`.
+
+**SCAR-G1-06:** rota de publicação — a configuração Git local não governa commits criados por outra API ou connector. Antes de adotar uma rota de publicação, provar os metadados que ela materializa; se falhar, conter antes de qualquer execução dependente. Evidência: `EVID-G1-0014`.
+
 Nenhum PATTERN ou WIN validado.
 
 ## Próxima investigação
 
-**Continuar a MISSÃO 05R somente após o guardrail manual.** Confirmar `PAID_OVERAGE_ALLOWED = FALSE`, saldo incluído e Actions habilitado; então executar somente discovery e, se aprovado, o precheck mínimo API 36. Encerrar a missão antes do adapter/Wave 1. Não iniciar E2, G2, produto, UI final ou stack de produção.
+**Aplicar e publicar primeiro a correção de binding, por Git local com noreply verificável.** Depois executar somente um discovery; se aprovado, o precheck mínimo API 36. Encerrar a missão antes do adapter/Wave 1. Não iniciar E2, G2, produto, UI final ou stack de produção.
