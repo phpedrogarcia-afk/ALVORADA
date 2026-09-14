@@ -1,7 +1,7 @@
 # SOURCE OF TRUTH
 
 **Snapshot:** 2026-09-14 · **ALVORADA: codinome**
-**G0: PASS. G1: CONDITIONAL. G1.1: PASS. G1.2: E0_PASS. G1.3 / MISSÃO 05R-C: LAB_DISCOVERY_CONDITIONAL_REMEDIATION_PROBE_NOT_RUN.** `REPOSITORY_BINDING = PASS` e `PUBLICATION_SECURITY_CHECK = PASS_WITH_CAVEAT`; `LAB_DISCOVERY = CONDITIONAL`, `REMEDIATION_PROBE = NOT_RUN`, P1–P10 = `UNKNOWN` e `READY_FOR_E1_WAVE1 = NO`; envelope validado vazio. G2 não liberado.
+**G0: PASS. G1: CONDITIONAL. G1.1: PASS. G1.2: E0_PASS. G1.3 / MISSÃO 05R-D: LAB_DISCOVERY_CONDITIONAL_REMEDIATION_PROBE_SDK_TOOLING_NOT_FOUND_EMULATOR_PROVISION_NOT_RUN.** `REPOSITORY_BINDING = PASS` e `PUBLICATION_SECURITY_CHECK = PASS_WITH_CAVEAT`; a remediation probe provou KVM R/W efêmero e localizou `sdkmanager`, `avdmanager` e `adb` naquela instância, mas não encontrou `emulator`. API 36, system image e AVD não foram provisionados; P1–P10 = `UNKNOWN` e `READY_FOR_E1_WAVE1 = NO`. G2 não liberado.
 
 ## Visão atual
 
@@ -26,10 +26,11 @@ Despertar sereno e eficaz, alarme primeiro, contexto seletivo e local-first. And
 | F-013 | FACT-DOC | Em 2026-09-12: Play exige target API 36+ para novos apps/updates; API 37 segue Preview; alarm/timer segue uso legítimo e restrito de exact alarm | Fontes oficiais revalidadas em `EVID-G1-0010` |
 | F-014 | FACT-EVID histórico | Na MISSÃO 05, GitHub-hosted Linux tinha aceleração Android documentada, mas o projeto ainda não possuía repo/runner autorizado; capacidade de CI não era binding executável | `EVID-G1-0009..0010`; sete repos então inspecionados, zero ALVORADA |
 | F-015 | FACT-EVID | `phpedrogarcia-afk/ALVORADA` é público; o histórico canônico foi sanitizado para o HEAD `e78c80365ab0345247704f5a27fe9fa80f096652` sem alteração das trees técnicas correspondentes. O snapshot Foundation+G1+harness+evidências permanece rastreável a partir da importação histórica de 53 arquivos | `EVID-G1-0012..0013`; SHAs pré-sanitização permanecem somente como proveniência |
-| F-016 | FACT-EVID | Actions está habilitado no repo público, o workflow manual está visível e nenhum workflow rodou; custo da missão = USD 0. Runner real, `/dev/kvm`, SDK/emulator/AVD e P1–P10 continuam não observados | `EVID-G1-0013`; `LAB_DISCOVERY = NOT_RUN` |
+| F-016 | FACT-EVID histórico | No marco da auditoria de publicação, Actions estava habilitado no repo público, o workflow manual estava visível e nenhum workflow havia rodado; custo daquele marco = USD 0. Runner real, `/dev/kvm`, SDK/emulator/AVD e P1–P10 ainda não tinham sido observados | `EVID-G1-0013`; estado anterior a `EVID-G1-0015..0016` |
 | F-017 | FACT-EVID / limite de inferência | A auditoria do histórico canônico alcançável não encontrou os padrões pesquisados de e-mail pessoal, tokens, chaves, credenciais, URLs autenticadas, `.env` ou secrets. Isso é `NO_MATCH_FOUND`, não prova de ausência global; clones, caches e objetos fora do histórico alcançável podem persistir | `EVID-G1-0013`; `PUBLICATION_SECURITY_CHECK = PASS_WITH_CAVEAT` |
 | F-018 | FACT-EVID | Uma rota de publicação externa materializou um commit com metadados fora da política noreply; o commit foi retirado imediatamente de `main`, que voltou ao HEAD sanitizado. A rota não deve ser usada para publicação canônica | `EVID-G1-0014`; nenhum discovery ou cenário E1 foi executado |
 | F-019 | FACT-EVID | O discovery GitHub-hosted no SHA `2d8dddf0d04fd22743725d7e48e0875f2b6ded25` observou runner Ubuntu 24.04, `/dev/kvm` presente mas sem R/W para o usuário e `sdkmanager`, `avdmanager`, `adb` e `emulator` como `NOT_FOUND_IN_PATH`. O exit 2 foi deliberado pelo audit, não crash de infraestrutura; nenhuma capacidade essencial foi provada | `EVID-G1-0015`; `LAB_DISCOVERY = CONDITIONAL` |
+| F-020 | FACT-EVID | A remediation probe no SHA `9177b8f4653d348fd367ea8964ea02a29c85a9be` tornou `/dev/kvm` R/W por ACL efêmera e localizou `sdkmanager`, `avdmanager` e `adb`, mas não encontrou o pacote/binário `emulator`; `emulator -accel-check` não rodou. A prova de KVM vale somente para aquela instância do runner; API 36, system image, AVD, P1–P10 e E1 não foram alcançados | `EVID-G1-0016`; `REMEDIATION_PROBE = SDK_TOOLING_NOT_FOUND` |
 
 FACTs documentais Android, APIs, URLs, confiança e divergências estão em [ANDROID-RELIABILITY-RESEARCH.md](docs/reliability/ANDROID-RELIABILITY-RESEARCH.md), não duplicados aqui.
 
@@ -77,8 +78,8 @@ Priorizar um elemento no G2 não prova benefício.
 
 ## OPEN — condições para sair de G1 CONDITIONAL
 
-1. Executar somente a remediation probe manual: verificar a menor correção efêmera de acesso a KVM e resolver tooling Android já descoberto, sem instalar API 36, system image, AVD ou executar guest.
-2. Somente se a remediation probe provar KVM usável, tooling essencial e aceleração adequada, autorizar em missão posterior o precheck mínimo API 36 e P1–P10; adapter e Wave 1 continuam fora da MISSÃO 05R-C.
+1. Executar somente a probe manual de provisionamento do pacote `emulator`: repetir a correção efêmera de KVM se necessária, instalar exclusivamente `emulator` com o `sdkmanager` existente e executar `emulator -version` e `emulator -accel-check`; não instalar API 36, system image ou AVD.
+2. Somente se a probe provar `emulator` instalado e aceleração adequada, autorizar em missão posterior o precheck mínimo API 36 e P1–P10; adapter e Wave 1 continuam fora da MISSÃO 05R-D.
 3. Depois da aprovação do laboratório, construir o adapter descartável e executar E1 real nas APIs 31, 34, 35, 36 e 37; E0 já passou.
 4. Escolher e obter modelos/fingerprints físicos para E2/E3; nenhuma família OEM é suportada por nome.
 5. Calibrar oráculo acústico, clocks e epsilon; escolher limite de disponibilidade de controles.
@@ -107,4 +108,4 @@ Nenhum PATTERN ou WIN validado.
 
 ## Próxima investigação
 
-**Executar somente a remediation probe manual.** Se ela provar o laboratório, o próximo passo é uma missão separada para o precheck mínimo API 36; se não, preservar o blocker causal. Não iniciar adapter/Wave 1, E2, G2, produto, UI final ou stack de produção.
+**Executar somente a probe manual de provisionamento do pacote `emulator`.** Instalar exclusivamente `emulator`, repetir apenas a ACL efêmera de KVM se necessária e provar `emulator -version`/`-accel-check`. Se passar, o próximo passo será uma missão separada para o precheck mínimo API 36; se não, preservar o blocker causal. Não instalar API 36, system image ou AVD nem iniciar adapter/Wave 1, E2, G2, produto, UI final ou stack de produção.
