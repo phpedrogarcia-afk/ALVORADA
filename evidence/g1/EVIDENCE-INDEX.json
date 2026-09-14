@@ -484,6 +484,74 @@
         "PUBLICATION_SECURITY_CHECK"
       ],
       "claim_envelope": "The noncompliant commit was removed from canonical main. This does not prove deletion from external caches, clones or unreachable object storage."
+    },
+    {
+      "evidence_id": "EVID-G1-0015",
+      "evidence_level": "GITHUB_ACTIONS_LAB_DISCOVERY",
+      "device_or_emulator": "No Android guest; GitHub-hosted Ubuntu runner only",
+      "api": null,
+      "build_fingerprint": null,
+      "scenario": "E1_LAB_DISCOVERY_CAPABILITY_AUDIT",
+      "scheduling_strategy": "NOT_REACHED",
+      "preconditions": "Manual discovery workflow on canonical public repository at 2d8dddf0d04fd22743725d7e48e0875f2b6ded25; no API, system image, AVD, Android guest, adapter, Wave 1, E2, or G2 execution",
+      "permission_state": "contents:read",
+      "scheduled_time": null,
+      "captured_at_utc": null,
+      "captured_at_utc_status": "NOT_PROVIDED_IN_IMMUTABLE_DISCOVERY_RECORD",
+      "repository": {
+        "visibility": "public",
+        "workflow_run_id": 34868790788,
+        "job_id": 104059262799,
+        "commit": "2d8dddf0d04fd22743725d7e48e0875f2b6ded25",
+        "workflow_permissions": "contents:read"
+      },
+      "event_timeline": [
+        "Run discovery on GitHub-hosted Ubuntu 24.04.5 LTS runner version 2.337.0",
+        "Observe /dev/kvm present with owner/group root:kvm but unreadable and unwritable to the runner user",
+        "Observe ANDROID_SDK_ROOT at /usr/local/lib/android/sdk",
+        "Observe sdkmanager, avdmanager, adb, and emulator as NOT_FOUND_IN_PATH",
+        "Persist only the discovery log as artifact 10357319133 with one-day retention",
+        "End with deliberate audit exit code 2 because one or more required capabilities were not proven"
+      ],
+      "metrics": {
+        "runner_environment": "github-hosted",
+        "runner_image": "ubuntu-24.04",
+        "runner_image_version": "20260907.300.1",
+        "cpu_count": 4,
+        "memory_kib": 16373452,
+        "workspace_free": "87 GiB",
+        "scenario_executions": 0,
+        "p1_p10_pass_count": 0,
+        "p1_p10_unknown_count": 10,
+        "p7_export_persistence_evidence": "PARTIAL_NOT_PASS",
+        "audit_exit_code": 2
+      },
+      "environment": {
+        "runner_version": "2.337.0",
+        "host_os": "Ubuntu 24.04.5 LTS",
+        "android_sdk_root": "/usr/local/lib/android/sdk",
+        "tooling_path_results": {
+          "sdkmanager": "NOT_FOUND_IN_PATH",
+          "avdmanager": "NOT_FOUND_IN_PATH",
+          "adb": "NOT_FOUND_IN_PATH",
+          "emulator": "NOT_FOUND_IN_PATH"
+        },
+        "kvm": {
+          "device_present": true,
+          "owner_group": "root:kvm",
+          "readable": false,
+          "writable": false,
+          "usable": "NOT_PROVEN"
+        }
+      },
+      "result": "LAB_DISCOVERY_CONDITIONAL",
+      "severity": "S3_OBSERVABILITY_TOOLING",
+      "raw_log_reference": "GitHub Actions artifact 10357319133",
+      "artifact_id": 10357319133,
+      "artifact_sha256": "dff60b278c01dbe1caee0c7b002edc2e4661ab799a9d0479f3ed57123c03f8df",
+      "artifact_retention_days": 1,
+      "related_contract_clause": ["D-G1-LAB-02", "MISSÃO 05R-C / LAB DISCOVERY", "READY_FOR_E1_WAVE1"],
+      "claim_envelope": "NOT_FOUND_IN_PATH does not assert absence from the filesystem. /dev/kvm presence does not establish KVM usability. The deliberate audit exit code 2 is not an infrastructure crash. P1-P10 remain UNKNOWN; partial P7 export/persistence evidence is not PASS. READY_FOR_E1_WAVE1 remains NO."
     }
   ]
 }

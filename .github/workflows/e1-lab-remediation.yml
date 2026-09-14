@@ -1,0 +1,205 @@
+name: E1 lab remediation probe
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: e1-lab-remediation-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  remediation-probe:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - name: Probe KVM access and existing Android tooling
+        shell: bash
+        run: |
+          set +e
+          log=e1-lab-remediation.log
+          : > "$log"
+          exec > >(tee -a "$log") 2>&1
+
+          echo "REMEDIATION_PROBE=STARTED"
+          echo "SCOPE=KVM_ACCESS_AND_EXISTING_ANDROID_TOOLING_ONLY"
+          echo "API36=NOT_PROVISIONED"
+          echo "AVD=NOT_CREATED"
+          echo "P1_P10=UNKNOWN"
+          echo "READY_FOR_E1_WAVE1=NO"
+
+          echo "KVM_BEFORE_ID_BEGIN"
+          id
+          echo "KVM_BEFORE_GROUPS_BEGIN"
+          groups
+          echo "KVM_BEFORE_LS_BEGIN"
+          ls -l /dev/kvm
+          echo "KVM_BEFORE_STAT_BEGIN"
+          stat /dev/kvm
+
+          if test -e /dev/kvm; then
+            kvm_device_present=YES
+          else
+            kvm_device_present=NO
+          fi
+          if test -r /dev/kvm; then
+            kvm_before_readable=YES
+          else
+            kvm_before_readable=NO
+          fi
+          if test -w /dev/kvm; then
+            kvm_before_writable=YES
+          else
+            kvm_before_writable=NO
+          fi
+          sudo -n true
+          sudo_status=$?
+          if [ "$sudo_status" -eq 0 ]; then
+            sudo_noninteractive=YES
+          else
+            sudo_noninteractive=NO
+          fi
+          printf 'KVM_DEVICE_PRESENT=%s\n' "$kvm_device_present"
+          printf 'KVM_BEFORE_READABLE=%s\n' "$kvm_before_readable"
+          printf 'KVM_BEFORE_WRITABLE=%s\n' "$kvm_before_writable"
+          printf 'SUDO_NONINTERACTIVE=%s\n' "$sudo_noninteractive"
+
+          kvm_mutation=NOT_NEEDED
+          if [ "$kvm_device_present" = YES ] && [ "$sudo_noninteractive" = YES ] && { [ "$kvm_before_readable" = NO ] || [ "$kvm_before_writable" = NO ]; }; then
+            if command -v setfacl >/dev/null 2>&1; then
+              kvm_mutation=ATTEMPTED_EPHEMERAL_SETFACL_USER_RW
+              printf 'KVM_MUTATION=%s\n' "$kvm_mutation"
+              sudo setfacl -m "u:${USER}:rw" /dev/kvm
+              setfacl_status=$?
+              printf 'KVM_MUTATION_EXIT_CODE=%s\n' "$setfacl_status"
+            else
+              kvm_mutation=NOT_ATTEMPTED_SETFACL_UNAVAILABLE
+            fi
+          fi
+          printf 'KVM_MUTATION=%s\n' "$kvm_mutation"
+          if test -r /dev/kvm; then
+            kvm_after_readable=YES
+          else
+            kvm_after_readable=NO
+          fi
+          if test -w /dev/kvm; then
+            kvm_after_writable=YES
+          else
+            kvm_after_writable=NO
+          fi
+          printf 'KVM_AFTER_READABLE=%s\n' "$kvm_after_readable"
+          printf 'KVM_AFTER_WRITABLE=%s\n' "$kvm_after_writable"
+
+          printf 'ANDROID_SDK_ROOT=%s\n' "${ANDROID_SDK_ROOT:-UNSET}"
+          printf 'ANDROID_HOME=%s\n' "${ANDROID_HOME:-UNSET}"
+          android_roots=("${ANDROID_SDK_ROOT:-}" "${ANDROID_HOME:-}")
+          declare -A path_result filesystem_result resolved_location
+
+          resolve_tool() {
+            local tool="$1"
+            local relative_pattern="$2"
+            local path_location=""
+            local filesystem_location=""
+            local root candidate
+            path_location=$(command -v "$tool" 2>/dev/null)
+            if [ -n "$path_location" ]; then
+              path_result[$tool]=FOUND
+            else
+              path_result[$tool]=NOT_FOUND_IN_PATH
+            fi
+            for root in "${android_roots[@]}"; do
+              [ -n "$root" ] && [ -d "$root" ] || continue
+              for candidate in "$root"/$relative_pattern; do
+                if [ -f "$candidate" ] && [ -x "$candidate" ]; then
+                  filesystem_location="$candidate"
+                  break 2
+                fi
+              done
+            done
+            if [ -n "$filesystem_location" ]; then
+              filesystem_result[$tool]=FOUND_IN_EXPECTED_SDK_ROOT
+            else
+              filesystem_result[$tool]=NOT_FOUND_IN_EXPECTED_SDK_ROOT
+            fi
+            resolved_location[$tool]="${path_location:-$filesystem_location}"
+            if [ -z "$path_location" ] && [ -n "$filesystem_location" ]; then
+              tool_directory=$(dirname "$filesystem_location")
+              export PATH="$tool_directory:$PATH"
+              printf '%s\n' "$tool_directory" >> "$GITHUB_PATH"
+            fi
+            printf '%s_PATH_RESULT=%s\n' "${tool^^}" "${path_result[$tool]}"
+            printf '%s_FILESYSTEM_RESULT=%s\n' "${tool^^}" "${filesystem_result[$tool]}"
+            printf '%s_LOCATION=%s\n' "${tool^^}" "${resolved_location[$tool]:-NOT_FOUND}"
+          }
+
+          resolve_tool sdkmanager 'cmdline-tools/*/bin/sdkmanager'
+          resolve_tool avdmanager 'cmdline-tools/*/bin/avdmanager'
+          resolve_tool adb 'platform-tools/adb'
+          resolve_tool emulator 'emulator/emulator'
+
+          components=()
+          for root in "${android_roots[@]}"; do
+            [ -n "$root" ] && [ -d "$root" ] || continue
+            [ -d "$root/platforms" ] && components+=(platforms-directory)
+            [ -d "$root/platform-tools" ] && components+=(platform-tools-directory)
+            [ -d "$root/emulator" ] && components+=(emulator-directory)
+            [ -d "$root/system-images" ] && components+=(system-images-directory)
+          done
+          if [ "${#components[@]}" -eq 0 ]; then
+            components_preexisting=NONE_OBSERVED_IN_EXPECTED_SDK_ROOTS
+          else
+            components_preexisting=$(IFS=,; echo "${components[*]}")
+          fi
+          printf 'SDKMANAGER_LOCATION=%s\n' "${resolved_location[sdkmanager]:-NOT_FOUND}"
+          printf 'AVDMANAGER_LOCATION=%s\n' "${resolved_location[avdmanager]:-NOT_FOUND}"
+          printf 'ADB_LOCATION=%s\n' "${resolved_location[adb]:-NOT_FOUND}"
+          printf 'EMULATOR_LOCATION=%s\n' "${resolved_location[emulator]:-NOT_FOUND}"
+          printf 'COMPONENTS_PREEXISTING=%s\n' "$components_preexisting"
+
+          emulator_accel_check=NOT_RUN_EMULATOR_NOT_FOUND
+          emulator_accel_exit_code=NOT_RUN
+          if [ -n "${resolved_location[emulator]}" ]; then
+            echo "EMULATOR_ACCEL_CHECK_OUTPUT_BEGIN"
+            "${resolved_location[emulator]}" -accel-check
+            emulator_accel_exit_code=$?
+            echo "EMULATOR_ACCEL_CHECK_OUTPUT_END"
+            if [ "$emulator_accel_exit_code" -eq 0 ]; then
+              emulator_accel_check=PASS
+            else
+              emulator_accel_check=FAIL
+            fi
+          fi
+          printf 'EMULATOR_ACCEL_CHECK=%s\n' "$emulator_accel_check"
+          printf 'EMULATOR_ACCEL_CHECK_EXIT_CODE=%s\n' "$emulator_accel_exit_code"
+
+          tooling_essential=YES
+          for tool in sdkmanager avdmanager adb emulator; do
+            if [ -z "${resolved_location[$tool]}" ]; then
+              tooling_essential=NO
+            fi
+          done
+          if [ "$kvm_after_readable" = YES ] && [ "$kvm_after_writable" = YES ] && [ "$tooling_essential" = YES ] && [ "$emulator_accel_check" = PASS ]; then
+            classification=REMEDIATION_PROBE_PASS
+          elif [ "$kvm_device_present" = NO ] || [ "$kvm_after_readable" = NO ] || [ "$kvm_after_writable" = NO ]; then
+            classification=KVM_BLOCKED
+          elif [ "$tooling_essential" = NO ]; then
+            classification=SDK_TOOLING_NOT_FOUND
+          elif [ "$emulator_accel_check" != PASS ]; then
+            classification=EMULATOR_ACCELERATION_BLOCKED
+          else
+            classification=OTHER_CAUSAL_BLOCKER_PROVEN
+          fi
+          printf 'REMEDIATION_PROBE_CLASSIFICATION=%s\n' "$classification"
+          echo "REMEDIATION_PROBE=COMPLETE"
+          exit 0
+
+      - name: Preserve remediation probe log
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: e1-lab-remediation-${{ github.sha }}-${{ github.run_id }}
+          path: e1-lab-remediation.log
+          if-no-files-found: error
+          retention-days: 1

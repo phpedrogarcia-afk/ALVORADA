@@ -1,7 +1,7 @@
 # SOURCE OF TRUTH
 
 **Snapshot:** 2026-09-14 · **ALVORADA: codinome**
-**G0: PASS. G1: CONDITIONAL. G1.1: PASS. G1.2: E0_PASS. G1.3 / MISSÃO 05R: PUBLIC_BINDING_READY_DISCOVERY_NOT_RUN.** `REPOSITORY_BINDING = PASS` e `PUBLICATION_SECURITY_CHECK = PASS_WITH_CAVEAT`; `LAB_DISCOVERY = NOT_RUN`, P1–P10 = `UNKNOWN` e `READY_FOR_E1_WAVE1 = NO`; envelope validado vazio. G2 não liberado.
+**G0: PASS. G1: CONDITIONAL. G1.1: PASS. G1.2: E0_PASS. G1.3 / MISSÃO 05R-C: LAB_DISCOVERY_CONDITIONAL_REMEDIATION_PROBE_NOT_RUN.** `REPOSITORY_BINDING = PASS` e `PUBLICATION_SECURITY_CHECK = PASS_WITH_CAVEAT`; `LAB_DISCOVERY = CONDITIONAL`, `REMEDIATION_PROBE = NOT_RUN`, P1–P10 = `UNKNOWN` e `READY_FOR_E1_WAVE1 = NO`; envelope validado vazio. G2 não liberado.
 
 ## Visão atual
 
@@ -29,6 +29,7 @@ Despertar sereno e eficaz, alarme primeiro, contexto seletivo e local-first. And
 | F-016 | FACT-EVID | Actions está habilitado no repo público, o workflow manual está visível e nenhum workflow rodou; custo da missão = USD 0. Runner real, `/dev/kvm`, SDK/emulator/AVD e P1–P10 continuam não observados | `EVID-G1-0013`; `LAB_DISCOVERY = NOT_RUN` |
 | F-017 | FACT-EVID / limite de inferência | A auditoria do histórico canônico alcançável não encontrou os padrões pesquisados de e-mail pessoal, tokens, chaves, credenciais, URLs autenticadas, `.env` ou secrets. Isso é `NO_MATCH_FOUND`, não prova de ausência global; clones, caches e objetos fora do histórico alcançável podem persistir | `EVID-G1-0013`; `PUBLICATION_SECURITY_CHECK = PASS_WITH_CAVEAT` |
 | F-018 | FACT-EVID | Uma rota de publicação externa materializou um commit com metadados fora da política noreply; o commit foi retirado imediatamente de `main`, que voltou ao HEAD sanitizado. A rota não deve ser usada para publicação canônica | `EVID-G1-0014`; nenhum discovery ou cenário E1 foi executado |
+| F-019 | FACT-EVID | O discovery GitHub-hosted no SHA `2d8dddf0d04fd22743725d7e48e0875f2b6ded25` observou runner Ubuntu 24.04, `/dev/kvm` presente mas sem R/W para o usuário e `sdkmanager`, `avdmanager`, `adb` e `emulator` como `NOT_FOUND_IN_PATH`. O exit 2 foi deliberado pelo audit, não crash de infraestrutura; nenhuma capacidade essencial foi provada | `EVID-G1-0015`; `LAB_DISCOVERY = CONDITIONAL` |
 
 FACTs documentais Android, APIs, URLs, confiança e divergências estão em [ANDROID-RELIABILITY-RESEARCH.md](docs/reliability/ANDROID-RELIABILITY-RESEARCH.md), não duplicados aqui.
 
@@ -76,8 +77,8 @@ Priorizar um elemento no G2 não prova benefício.
 
 ## OPEN — condições para sair de G1 CONDITIONAL
 
-1. Aplicar e publicar a correção de binding via Git local com metadados noreply verificáveis; não usar a rota externa que materializa commits fora dessa política.
-2. Executar um único discovery run, observar KVM/runner/tooling e, somente se `LAB_DISCOVERY_PASS`, provisionar API 36 e completar P1–P10; adapter e Wave 1 continuam fora da MISSÃO 05R.
+1. Executar somente a remediation probe manual: verificar a menor correção efêmera de acesso a KVM e resolver tooling Android já descoberto, sem instalar API 36, system image, AVD ou executar guest.
+2. Somente se a remediation probe provar KVM usável, tooling essencial e aceleração adequada, autorizar em missão posterior o precheck mínimo API 36 e P1–P10; adapter e Wave 1 continuam fora da MISSÃO 05R-C.
 3. Depois da aprovação do laboratório, construir o adapter descartável e executar E1 real nas APIs 31, 34, 35, 36 e 37; E0 já passou.
 4. Escolher e obter modelos/fingerprints físicos para E2/E3; nenhuma família OEM é suportada por nome.
 5. Calibrar oráculo acústico, clocks e epsilon; escolher limite de disponibilidade de controles.
@@ -106,4 +107,4 @@ Nenhum PATTERN ou WIN validado.
 
 ## Próxima investigação
 
-**Aplicar e publicar primeiro a correção de binding, por Git local com noreply verificável.** Depois executar somente um discovery; se aprovado, o precheck mínimo API 36. Encerrar a missão antes do adapter/Wave 1. Não iniciar E2, G2, produto, UI final ou stack de produção.
+**Executar somente a remediation probe manual.** Se ela provar o laboratório, o próximo passo é uma missão separada para o precheck mínimo API 36; se não, preservar o blocker causal. Não iniciar adapter/Wave 1, E2, G2, produto, UI final ou stack de produção.
