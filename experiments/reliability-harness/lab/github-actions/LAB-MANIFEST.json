@@ -276,6 +276,42 @@
       "emulator -version exits 0",
       "KVM readable and writable after optional ephemeral remediation",
       "emulator -accel-check passes"
-    ]
+    ],
+    "sdk_root_resolution": {
+      "primary": "ANDROID_HOME",
+      "legacy_compatibility": "ANDROID_SDK_ROOT",
+      "require_canonical_equality_when_both_defined": true,
+      "install_uses_explicit_sdk_root": true
+    },
+    "emulator_revision_evidence": {
+      "status": "NOT_RUN",
+      "metadata_sources": [
+        "emulator/package.xml",
+        "emulator/source.properties"
+      ],
+      "revision_status_values": [
+        "RESOLVED_CONSISTENT",
+        "RESOLVED_SINGLE_SOURCE",
+        "CONFLICT",
+        "UNAVAILABLE"
+      ],
+      "output_fields": [
+        "EMULATOR_INTERNAL_REVISION",
+        "EMULATOR_REVISION_STATUS",
+        "EMULATOR_REVISION_EVIDENCE_READY"
+      ],
+      "affects_emulator_provision_pass": false
+    },
+    "gpu_capability_evidence": {
+      "status": "NOT_RUN",
+      "source": "CURRENT_EMULATOR_BINARY_READ_ONLY_HELP",
+      "mode_selection": "NOT_PERFORMED",
+      "output_fields": [
+        "GPU_CAPABILITY_DISCOVERY_STATUS",
+        "GPU_MODE_CANDIDATES",
+        "GPU_LOCK_EVIDENCE_READY"
+      ],
+      "unavailable_or_ambiguous_affects_emulator_provision_pass": false
+    }
   }
 }

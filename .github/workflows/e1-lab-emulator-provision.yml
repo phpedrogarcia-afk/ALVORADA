@@ -21,7 +21,9 @@ jobs:
           set +e
           log=e1-lab-emulator-provision.log
           install_output=$(mktemp)
-          trap 'rm -f "$install_output"' EXIT
+          emulator_help_output=$(mktemp)
+          gpu_help_output=$(mktemp)
+          trap 'rm -f "$install_output" "$emulator_help_output" "$gpu_help_output"' EXIT
           : > "$log"
           exec > >(tee -a "$log") 2>&1
 
@@ -32,20 +34,72 @@ jobs:
           echo "P1_P10=UNKNOWN"
           echo "READY_FOR_E1_WAVE1=NO"
 
-          android_sdk_root="${ANDROID_SDK_ROOT:-}"
-          android_home="${ANDROID_HOME:-}"
-          if [ -z "$android_sdk_root" ]; then
-            android_sdk_root="$android_home"
+          android_home_raw="${ANDROID_HOME:-}"
+          android_sdk_root_raw="${ANDROID_SDK_ROOT:-}"
+          android_home_canonical=UNSET
+          android_sdk_root_canonical=UNSET
+          canonical_sdk_root=""
+          sdk_root_source=NONE
+          sdk_root_status=INVALID
+
+          canonicalize_sdk_root() {
+            local candidate="$1"
+            [ -n "$candidate" ] && [ -d "$candidate" ] || return 1
+            realpath -e -- "$candidate" 2>/dev/null
+          }
+
+          if [ -n "$android_home_raw" ]; then
+            android_home_canonical=$(canonicalize_sdk_root "$android_home_raw")
+            if [ -z "$android_home_canonical" ]; then
+              android_home_canonical=INVALID
+            fi
           fi
-          printf 'ANDROID_SDK_ROOT=%s\n' "${ANDROID_SDK_ROOT:-UNSET}"
+          if [ -n "$android_sdk_root_raw" ]; then
+            android_sdk_root_canonical=$(canonicalize_sdk_root "$android_sdk_root_raw")
+            if [ -z "$android_sdk_root_canonical" ]; then
+              android_sdk_root_canonical=INVALID
+            fi
+          fi
+
+          if [ -n "$android_home_raw" ] && [ -n "$android_sdk_root_raw" ]; then
+            if [ "$android_home_canonical" = INVALID ] || [ "$android_sdk_root_canonical" = INVALID ]; then
+              sdk_root_source=BOTH_DEFINED_INVALID
+              sdk_root_status=INVALID
+            elif [ "$android_home_canonical" != "$android_sdk_root_canonical" ]; then
+              sdk_root_source=BOTH_DEFINED_DIVERGENT
+              sdk_root_status=AMBIGUOUS
+            else
+              canonical_sdk_root="$android_home_canonical"
+              sdk_root_source=ANDROID_HOME_AND_ANDROID_SDK_ROOT
+              sdk_root_status=RESOLVED
+            fi
+          elif [ -n "$android_home_raw" ]; then
+            sdk_root_source=ANDROID_HOME
+            if [ "$android_home_canonical" != INVALID ]; then
+              canonical_sdk_root="$android_home_canonical"
+              sdk_root_status=RESOLVED
+            fi
+          elif [ -n "$android_sdk_root_raw" ]; then
+            sdk_root_source=LEGACY_ANDROID_SDK_ROOT_ONLY
+            if [ "$android_sdk_root_canonical" != INVALID ]; then
+              canonical_sdk_root="$android_sdk_root_canonical"
+              sdk_root_status=RESOLVED
+            fi
+          fi
+
           printf 'ANDROID_HOME=%s\n' "${ANDROID_HOME:-UNSET}"
-          printf 'RESOLVED_ANDROID_SDK_ROOT=%s\n' "${android_sdk_root:-NOT_FOUND}"
+          printf 'ANDROID_SDK_ROOT=%s\n' "${ANDROID_SDK_ROOT:-UNSET}"
+          printf 'ANDROID_HOME_CANONICAL=%s\n' "$android_home_canonical"
+          printf 'ANDROID_SDK_ROOT_CANONICAL=%s\n' "$android_sdk_root_canonical"
+          printf 'SDK_ROOT_SOURCE=%s\n' "$sdk_root_source"
+          printf 'SDK_ROOT_STATUS=%s\n' "$sdk_root_status"
+          printf 'CANONICAL_SDK_ROOT=%s\n' "${canonical_sdk_root:-NOT_RESOLVED}"
 
           sdkmanager_location=NOT_FOUND
-          if [ -n "$android_sdk_root" ] && [ -x "$android_sdk_root/cmdline-tools/latest/bin/sdkmanager" ]; then
-            sdkmanager_location="$android_sdk_root/cmdline-tools/latest/bin/sdkmanager"
-          elif [ -n "$android_sdk_root" ] && [ -d "$android_sdk_root/cmdline-tools" ]; then
-            for candidate in "$android_sdk_root"/cmdline-tools/*/bin/sdkmanager; do
+          if [ "$sdk_root_status" = RESOLVED ] && [ -x "$canonical_sdk_root/cmdline-tools/latest/bin/sdkmanager" ]; then
+            sdkmanager_location="$canonical_sdk_root/cmdline-tools/latest/bin/sdkmanager"
+          elif [ "$sdk_root_status" = RESOLVED ] && [ -d "$canonical_sdk_root/cmdline-tools" ]; then
+            for candidate in "$canonical_sdk_root"/cmdline-tools/*/bin/sdkmanager; do
               if [ -f "$candidate" ] && [ -x "$candidate" ]; then
                 sdkmanager_location="$candidate"
                 break
@@ -65,9 +119,9 @@ jobs:
           printf 'SDKMANAGER_VERSION_EXIT_CODE=%s\n' "$sdkmanager_version_exit_code"
 
           emulator_location_before=NOT_FOUND
-          if [ -n "$android_sdk_root" ] && [ -x "$android_sdk_root/emulator/emulator" ]; then
+          if [ "$sdk_root_status" = RESOLVED ] && [ -x "$canonical_sdk_root/emulator/emulator" ]; then
             emulator_present_before=YES
-            emulator_location_before="$android_sdk_root/emulator/emulator"
+            emulator_location_before="$canonical_sdk_root/emulator/emulator"
           else
             emulator_present_before=NO
           fi
@@ -139,6 +193,9 @@ jobs:
           if [ "$emulator_present_before" = YES ]; then
             emulator_install_reason=SKIPPED_ALREADY_PRESENT
             emulator_install_exit_code=NOT_RUN_ALREADY_PRESENT
+          elif [ "$sdk_root_status" != RESOLVED ]; then
+            emulator_install_reason=SKIPPED_SDK_ROOT_NOT_RESOLVED
+            emulator_install_exit_code=NOT_RUN_SDK_ROOT_NOT_RESOLVED
           elif [ "$sdkmanager_location" = NOT_FOUND ]; then
             emulator_install_reason=SKIPPED_SDKMANAGER_NOT_FOUND
             emulator_install_exit_code=NOT_RUN_SDKMANAGER_NOT_FOUND
@@ -148,7 +205,7 @@ jobs:
           else
             emulator_install_attempted=YES
             emulator_install_reason=EMULATOR_ABSENT_AND_PREREQUISITES_READY
-            "$sdkmanager_location" "emulator" </dev/null 2>&1 | tee "$install_output"
+            "$sdkmanager_location" --sdk_root="$canonical_sdk_root" "emulator" </dev/null 2>&1 | tee "$install_output"
             emulator_install_exit_code=${PIPESTATUS[0]}
             if [ "$emulator_install_exit_code" -ne 0 ] && grep -Eqi 'license.*(not accepted|not been accepted)|accept.*license' "$install_output"; then
               emulator_license_blocked=YES
@@ -160,9 +217,9 @@ jobs:
           printf 'EMULATOR_LICENSE_BLOCKED=%s\n' "$emulator_license_blocked"
 
           emulator_location_after=NOT_FOUND
-          if [ -n "$android_sdk_root" ] && [ -x "$android_sdk_root/emulator/emulator" ]; then
+          if [ "$sdk_root_status" = RESOLVED ] && [ -x "$canonical_sdk_root/emulator/emulator" ]; then
             emulator_present_after=YES
-            emulator_location_after="$android_sdk_root/emulator/emulator"
+            emulator_location_after="$canonical_sdk_root/emulator/emulator"
           else
             emulator_present_after=NO
           fi
@@ -204,7 +261,190 @@ jobs:
           printf 'EMULATOR_ACCEL_CHECK=%s\n' "$emulator_accel_check"
           printf 'EMULATOR_ACCEL_CHECK_EXIT_CODE=%s\n' "$emulator_accel_check_exit_code"
 
-          if [ "$emulator_present_before" = NO ] && [ "$sdkmanager_location" = NOT_FOUND ]; then
+          emulator_package_xml_present=NO
+          emulator_source_properties_present=NO
+          emulator_package_xml_revision=""
+          emulator_source_properties_revision=""
+          emulator_package_xml_sha256=NOT_AVAILABLE
+          emulator_source_properties_sha256=NOT_AVAILABLE
+          emulator_internal_revision=""
+          emulator_revision_status=UNAVAILABLE
+          emulator_revision_provenance=NONE
+          emulator_metadata_conflict=NO
+          emulator_revision_evidence_ready=NO
+
+          if [ "$emulator_present_after" = YES ]; then
+            package_xml_path="$canonical_sdk_root/emulator/package.xml"
+            source_properties_path="$canonical_sdk_root/emulator/source.properties"
+
+            if [ -f "$package_xml_path" ]; then
+              emulator_package_xml_present=YES
+              emulator_package_xml_sha256=$(sha256sum "$package_xml_path" | awk '{print $1}')
+              if command -v python3 >/dev/null 2>&1; then
+                emulator_package_xml_revision=$(python3 -c '
+          import sys
+          import xml.etree.ElementTree as ET
+
+          def local_name(tag):
+              return tag.rsplit("}", 1)[-1]
+
+          root = ET.parse(sys.argv[1]).getroot()
+          revision = next((node for node in root.iter() if local_name(node.tag) == "revision"), None)
+          if revision is None:
+              raise SystemExit(2)
+          values = {}
+          for child in list(revision):
+              name = local_name(child.tag)
+              if name in {"major", "minor", "micro", "preview"} and child.text:
+                  values[name] = child.text.strip()
+          if "major" not in values:
+              raise SystemExit(2)
+          parts = [values["major"]]
+          for name in ("minor", "micro", "preview"):
+              if name in values:
+                  parts.append(values[name])
+          candidate = ".".join(parts)
+          if not all(part.isdigit() for part in parts):
+              raise SystemExit(2)
+          print(candidate)
+          ' "$package_xml_path" 2>/dev/null)
+              fi
+            fi
+
+            if [ -f "$source_properties_path" ]; then
+              emulator_source_properties_present=YES
+              emulator_source_properties_sha256=$(sha256sum "$source_properties_path" | awk '{print $1}')
+              emulator_source_properties_revision=$(awk -F= '
+                /^[[:space:]]*Pkg[.]Revision[[:space:]]*=/ {
+                  value=$0
+                  sub(/^[^=]*=/, "", value)
+                  gsub(/[[:space:]]/, "", value)
+                  print value
+                  exit
+                }
+              ' "$source_properties_path")
+              if ! [[ "$emulator_source_properties_revision" =~ ^[0-9]+([.][0-9]+){0,3}$ ]]; then
+                emulator_source_properties_revision=""
+              fi
+            fi
+
+            if [ -n "$emulator_package_xml_revision" ] && [ -n "$emulator_source_properties_revision" ]; then
+              if [ "$emulator_package_xml_revision" = "$emulator_source_properties_revision" ]; then
+                emulator_internal_revision="$emulator_package_xml_revision"
+                emulator_revision_status=RESOLVED_CONSISTENT
+                emulator_revision_provenance=PACKAGE_XML_AND_SOURCE_PROPERTIES
+                emulator_revision_evidence_ready=YES
+              else
+                emulator_metadata_conflict=YES
+                emulator_revision_status=CONFLICT
+                emulator_revision_provenance=CONFLICTING_SOURCES
+              fi
+            elif [ -n "$emulator_package_xml_revision" ]; then
+              emulator_internal_revision="$emulator_package_xml_revision"
+              emulator_revision_status=RESOLVED_SINGLE_SOURCE
+              emulator_revision_provenance=PACKAGE_XML_ONLY
+              emulator_revision_evidence_ready=YES
+            elif [ -n "$emulator_source_properties_revision" ]; then
+              emulator_internal_revision="$emulator_source_properties_revision"
+              emulator_revision_status=RESOLVED_SINGLE_SOURCE
+              emulator_revision_provenance=SOURCE_PROPERTIES_ONLY
+              emulator_revision_evidence_ready=YES
+            fi
+          fi
+
+          printf 'EMULATOR_PACKAGE_XML_PRESENT=%s\n' "$emulator_package_xml_present"
+          printf 'EMULATOR_SOURCE_PROPERTIES_PRESENT=%s\n' "$emulator_source_properties_present"
+          printf 'EMULATOR_PACKAGE_XML_REVISION=%s\n' "$emulator_package_xml_revision"
+          printf 'EMULATOR_SOURCE_PROPERTIES_REVISION=%s\n' "$emulator_source_properties_revision"
+          printf 'EMULATOR_INTERNAL_REVISION=%s\n' "$emulator_internal_revision"
+          printf 'EMULATOR_PACKAGE_XML_SHA256=%s\n' "$emulator_package_xml_sha256"
+          printf 'EMULATOR_SOURCE_PROPERTIES_SHA256=%s\n' "$emulator_source_properties_sha256"
+          printf 'EMULATOR_METADATA_CONFLICT=%s\n' "$emulator_metadata_conflict"
+          printf 'EMULATOR_REVISION_STATUS=%s\n' "$emulator_revision_status"
+          printf 'EMULATOR_REVISION_PROVENANCE=%s\n' "$emulator_revision_provenance"
+          printf 'EMULATOR_REVISION_EVIDENCE_READY=%s\n' "$emulator_revision_evidence_ready"
+
+          emulator_help_exit_code=NOT_RUN
+          emulator_help_gpu_attempted=NO
+          emulator_help_gpu_exit_code=NOT_RUN
+          gpu_help_interface_discovered=NO
+          gpu_capability_discovery_status=UNAVAILABLE
+          gpu_evidence_source=NONE
+          gpu_evidence_sha256=NOT_AVAILABLE
+          gpu_mode_candidates='[]'
+          gpu_lock_evidence_ready=NO
+
+          if [ "$emulator_present_after" = YES ]; then
+            timeout 15s "$emulator_location_after" -help >"$emulator_help_output" 2>&1
+            emulator_help_exit_code=$?
+            if grep -Eq -- '(^|[[:space:]])-help-gpu([[:space:]]|$)' "$emulator_help_output"; then
+              gpu_help_interface_discovered=YES
+              emulator_help_gpu_attempted=YES
+              timeout 15s "$emulator_location_after" -help-gpu >"$gpu_help_output" 2>&1
+              emulator_help_gpu_exit_code=$?
+              gpu_evidence_source=CURRENT_EMULATOR_BINARY
+              if [ -s "$gpu_help_output" ]; then
+                gpu_evidence_sha256=$(sha256sum "$gpu_help_output" | awk '{print $1}')
+              fi
+              if [ "$emulator_help_gpu_exit_code" -eq 0 ] && [ -s "$gpu_help_output" ] && command -v python3 >/dev/null 2>&1; then
+                gpu_mode_candidates=$(python3 -c '
+          import json
+          import re
+          import sys
+
+          lines = open(sys.argv[1], encoding="utf-8", errors="replace").read().splitlines()
+          header = None
+          for index, line in enumerate(lines):
+              lowered = line.lower()
+              if ("mode" in lowered or "gpu" in lowered) and any(token in lowered for token in ("one of", "available", "supported", "valid")):
+                  header = index
+                  break
+          if header is None:
+              print("[]")
+              raise SystemExit(0)
+          candidates = set()
+          for line in lines[header + 1:]:
+              if not line.strip():
+                  if candidates:
+                      break
+                  continue
+              match = re.match(r"^\s+(?:[-*]\s*)?([a-z][a-z0-9_-]{0,63})(?:\s{2,}|\s+-\s+|\s*:\s*)\S", line)
+              if match:
+                  token = match.group(1)
+                  if token not in {"and", "default", "example", "mode", "note", "the", "use"}:
+                      candidates.add(token)
+              elif candidates and not line.startswith((" ", "\t")):
+                  break
+          print(json.dumps(sorted(candidates), separators=(",", ":")))
+          ' "$gpu_help_output" 2>/dev/null)
+                if [ -z "$gpu_mode_candidates" ]; then
+                  gpu_mode_candidates='[]'
+                fi
+              fi
+              if [ "$emulator_help_gpu_exit_code" -eq 0 ] && [ "$gpu_mode_candidates" != '[]' ]; then
+                gpu_capability_discovery_status=OBSERVED
+                gpu_lock_evidence_ready=YES
+              elif [ "$emulator_help_gpu_exit_code" -eq 0 ] && [ -s "$gpu_help_output" ]; then
+                gpu_capability_discovery_status=AMBIGUOUS
+              fi
+            fi
+          fi
+
+          printf 'EMULATOR_GENERAL_HELP_EXIT_CODE=%s\n' "$emulator_help_exit_code"
+          printf 'GPU_HELP_INTERFACE_DISCOVERED=%s\n' "$gpu_help_interface_discovered"
+          printf 'EMULATOR_HELP_GPU_ATTEMPTED=%s\n' "$emulator_help_gpu_attempted"
+          printf 'EMULATOR_HELP_GPU_EXIT_CODE=%s\n' "$emulator_help_gpu_exit_code"
+          printf 'GPU_CAPABILITY_DISCOVERY_STATUS=%s\n' "$gpu_capability_discovery_status"
+          printf 'GPU_EVIDENCE_SOURCE=%s\n' "$gpu_evidence_source"
+          printf 'GPU_EVIDENCE_SHA256=%s\n' "$gpu_evidence_sha256"
+          printf 'GPU_MODE_CANDIDATES=%s\n' "$gpu_mode_candidates"
+          printf 'GPU_LOCK_EVIDENCE_READY=%s\n' "$gpu_lock_evidence_ready"
+
+          if [ "$sdk_root_status" = AMBIGUOUS ]; then
+            classification=SDK_ROOT_AMBIGUOUS
+          elif [ "$sdk_root_status" != RESOLVED ]; then
+            classification=SDK_ROOT_INVALID
+          elif [ "$emulator_present_before" = NO ] && [ "$sdkmanager_location" = NOT_FOUND ]; then
             classification=SDKMANAGER_NOT_FOUND
           elif [ "$kvm_device_present" != YES ] || [ "$kvm_after_readable" != YES ] || [ "$kvm_after_writable" != YES ]; then
             classification=KVM_REMEDIATION_FAILED
@@ -226,7 +466,13 @@ jobs:
             classification=EMULATOR_SOURCE_UNRESOLVED
           fi
 
+          if [ "$classification" = EMULATOR_PROVISION_PASS ]; then
+            emulator_provision_pass=YES
+          else
+            emulator_provision_pass=NO
+          fi
           printf 'EMULATOR_PROVISION_CLASSIFICATION=%s\n' "$classification"
+          printf 'EMULATOR_PROVISION_PASS=%s\n' "$emulator_provision_pass"
           echo "API36=NOT_PROVISIONED"
           echo "SYSTEM_IMAGE=NOT_PROVISIONED"
           echo "AVD=NOT_CREATED"
