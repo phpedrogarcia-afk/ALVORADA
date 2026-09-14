@@ -23,7 +23,8 @@ jobs:
           install_output=$(mktemp)
           emulator_help_output=$(mktemp)
           gpu_help_output=$(mktemp)
-          trap 'rm -f "$install_output" "$emulator_help_output" "$gpu_help_output"' EXIT
+          gpu_evidence_projection=$(mktemp)
+          trap 'rm -f "$install_output" "$emulator_help_output" "$gpu_help_output" "$gpu_evidence_projection"' EXIT
           : > "$log"
           exec > >(tee -a "$log") 2>&1
 
@@ -370,9 +371,19 @@ jobs:
           gpu_help_interface_discovered=NO
           gpu_capability_discovery_status=UNAVAILABLE
           gpu_evidence_source=NONE
+          gpu_evidence_projection_sha256=NOT_AVAILABLE
           gpu_evidence_sha256=NOT_AVAILABLE
+          gpu_evidence_projection_byte_count=0
+          gpu_evidence_projection_truncated=NO
+          gpu_evidence_projection_normalization=NONE
+          gpu_evidence_projection_terminal_lf=NOT_APPLICABLE
+          gpu_evidence_projection_preserved=NO
+          gpu_parser_status=NOT_RUN
+          gpu_parser_exit_code=NOT_RUN
           gpu_mode_candidates='[]'
+          gpu_candidate_count=0
           gpu_lock_evidence_ready=NO
+          gpu_evidence_projection_max_bytes=65536
 
           if [ "$emulator_present_after" = YES ]; then
             timeout 15s "$emulator_location_after" -help >"$emulator_help_output" 2>&1
@@ -383,49 +394,159 @@ jobs:
               timeout 15s "$emulator_location_after" -help-gpu >"$gpu_help_output" 2>&1
               emulator_help_gpu_exit_code=$?
               gpu_evidence_source=CURRENT_EMULATOR_BINARY
-              if [ -s "$gpu_help_output" ]; then
-                gpu_evidence_sha256=$(sha256sum "$gpu_help_output" | awk '{print $1}')
+
+              gpu_help_output_byte_count=$(wc -c <"$gpu_help_output" | tr -d '[:space:]')
+              gpu_evidence_projection_payload_max_bytes=$((gpu_evidence_projection_max_bytes - 1))
+              if [ "$gpu_help_output_byte_count" -gt "$gpu_evidence_projection_payload_max_bytes" ]; then
+                head -c "$gpu_evidence_projection_payload_max_bytes" "$gpu_help_output" >"$gpu_evidence_projection"
+                gpu_evidence_projection_truncated=YES
+              else
+                cp "$gpu_help_output" "$gpu_evidence_projection"
               fi
-              if [ "$emulator_help_gpu_exit_code" -eq 0 ] && [ -s "$gpu_help_output" ] && command -v python3 >/dev/null 2>&1; then
-                gpu_mode_candidates=$(python3 -c '
+              gpu_evidence_projection_byte_count=$(wc -c <"$gpu_evidence_projection" | tr -d '[:space:]')
+
+              if [ "$gpu_evidence_projection_byte_count" -gt 0 ]; then
+                gpu_projection_last_octet=$(tail -c 1 "$gpu_evidence_projection" | od -An -t u1 | tr -d '[:space:]')
+                if [ "$gpu_projection_last_octet" != 10 ]; then
+                  printf '\n' >>"$gpu_evidence_projection"
+                  gpu_evidence_projection_normalization=APPENDED_TERMINAL_LF
+                fi
+                gpu_evidence_projection_terminal_lf=YES
+              fi
+              gpu_evidence_projection_byte_count=$(wc -c <"$gpu_evidence_projection" | tr -d '[:space:]')
+
+              gpu_projection_hash_output=$(sha256sum "$gpu_evidence_projection" 2>/dev/null)
+              gpu_projection_hash_exit_code=$?
+              gpu_projection_hash_candidate=$(printf '%s' "$gpu_projection_hash_output" | awk '{print $1}')
+              if [ "$gpu_projection_hash_exit_code" -eq 0 ] && [[ "$gpu_projection_hash_candidate" =~ ^[0-9a-f]{64}$ ]]; then
+                gpu_evidence_projection_sha256="$gpu_projection_hash_candidate"
+                gpu_evidence_sha256="$gpu_projection_hash_candidate"
+              fi
+
+              printf 'GPU_HELP_OUTPUT_BYTE_COUNT=%s\n' "$gpu_help_output_byte_count"
+              printf 'GPU_EVIDENCE_PROJECTION_MAX_BYTES=%s\n' "$gpu_evidence_projection_max_bytes"
+              printf 'GPU_EVIDENCE_PROJECTION_BYTE_COUNT=%s\n' "$gpu_evidence_projection_byte_count"
+              printf 'GPU_EVIDENCE_PROJECTION_TRUNCATED=%s\n' "$gpu_evidence_projection_truncated"
+              printf 'GPU_EVIDENCE_PROJECTION_NORMALIZATION=%s\n' "$gpu_evidence_projection_normalization"
+              printf 'GPU_EVIDENCE_PROJECTION_TERMINAL_LF=%s\n' "$gpu_evidence_projection_terminal_lf"
+              printf 'GPU_EVIDENCE_PROJECTION_SHA256=%s\n' "$gpu_evidence_projection_sha256"
+              echo "GPU_EVIDENCE_PROJECTION_BEGIN"
+              cat "$gpu_evidence_projection"
+              echo "GPU_EVIDENCE_PROJECTION_END"
+              gpu_evidence_projection_preserved=YES
+
+              if [ "$emulator_help_gpu_exit_code" -eq 0 ] && [ "$gpu_evidence_projection_byte_count" -gt 0 ]; then
+                if [ "$gpu_evidence_projection_truncated" = YES ] || [ "$gpu_evidence_projection_terminal_lf" != YES ]; then
+                  gpu_parser_status=REJECTED_AMBIGUOUS
+                  gpu_parser_exit_code=NOT_RUN_PROJECTION_NOT_EXACTLY_DELIMITABLE
+                  gpu_capability_discovery_status=AMBIGUOUS
+                elif ! command -v python3 >/dev/null 2>&1; then
+                  gpu_parser_status=FAILED
+                  gpu_parser_exit_code=NOT_RUN_PYTHON3_NOT_FOUND
+                  gpu_capability_discovery_status=AMBIGUOUS
+                else
+                  gpu_parser_output=$(python3 -c '
           import json
           import re
           import sys
 
-          lines = open(sys.argv[1], encoding="utf-8", errors="replace").read().splitlines()
-          header = None
-          for index, line in enumerate(lines):
-              lowered = line.lower()
-              if ("mode" in lowered or "gpu" in lowered) and any(token in lowered for token in ("one of", "available", "supported", "valid")):
-                  header = index
-                  break
-          if header is None:
-              print("[]")
-              raise SystemExit(0)
-          candidates = set()
+          text = open(sys.argv[1], encoding="utf-8", errors="strict").read()
+          lines = text.splitlines()
+
+          def is_strict_header(line):
+              normalized = line.strip().lower()
+              has_gpu = re.search(r"\bgpu\b", normalized) is not None
+              has_mode = re.search(r"\bmodes?\b", normalized) is not None
+              explicit_sequence = any(phrase in normalized for phrase in ("one of", "the following", "listed below"))
+              exact_named_list = re.fullmatch(r"(?:available|supported|valid)\s+gpu\s+modes?\s*:", normalized) is not None
+              exact_gpu_list = re.fullmatch(r"gpu\s+modes?(?:\s+(?:available|supported|valid))?\s*:", normalized) is not None
+              return has_gpu and has_mode and ((explicit_sequence and normalized.endswith(":")) or exact_named_list or exact_gpu_list)
+
+          headers = [index for index, line in enumerate(lines) if is_strict_header(line)]
+          if len(headers) != 1:
+              raise SystemExit(3)
+
+          header = headers[0]
+          candidate_pattern = re.compile(
+              r"^(\s+)(?:[-*]\s+)?([a-z][a-z0-9_-]{0,63})(?:(\s*)$|(?:\s{2,}|\s+-\s+|\s*:\s+)(\S.*))"
+          )
+          excluded = {
+              "and", "available", "default", "example", "following", "gpu", "mode",
+              "modes", "note", "supported", "the", "this", "use", "valid"
+          }
+          candidates = []
+          expected_indent = None
+          expected_style = None
+          started = False
+
           for line in lines[header + 1:]:
               if not line.strip():
-                  if candidates:
+                  if started:
                       break
                   continue
-              match = re.match(r"^\s+(?:[-*]\s*)?([a-z][a-z0-9_-]{0,63})(?:\s{2,}|\s+-\s+|\s*:\s*)\S", line)
-              if match:
-                  token = match.group(1)
-                  if token not in {"and", "default", "example", "mode", "note", "the", "use"}:
-                      candidates.add(token)
-              elif candidates and not line.startswith((" ", "\t")):
-                  break
-          print(json.dumps(sorted(candidates), separators=(",", ":")))
-          ' "$gpu_help_output" 2>/dev/null)
-                if [ -z "$gpu_mode_candidates" ]; then
-                  gpu_mode_candidates='[]'
+              match = candidate_pattern.fullmatch(line)
+              if match is None:
+                  raise SystemExit(3)
+              indent, token, bare_suffix, description = match.groups()
+              style = "BARE" if description is None else "DESCRIBED"
+              if token in excluded:
+                  raise SystemExit(3)
+              if expected_indent is None:
+                  expected_indent = len(indent)
+                  expected_style = style
+              elif len(indent) != expected_indent or style != expected_style:
+                  raise SystemExit(3)
+              candidates.append(token)
+              started = True
+
+          normalized_candidates = sorted(set(candidates))
+          if not normalized_candidates:
+              raise SystemExit(3)
+
+          print(f"{len(normalized_candidates)}\t{json.dumps(normalized_candidates, separators=(',', ':'))}")
+          ' "$gpu_evidence_projection" 2>/dev/null)
+                  gpu_parser_exit_code=$?
+                  if [ "$gpu_parser_exit_code" -eq 0 ] && [[ "$gpu_parser_output" == *$'\t'* ]]; then
+                    gpu_candidate_count="${gpu_parser_output%%$'\t'*}"
+                    gpu_mode_candidates="${gpu_parser_output#*$'\t'}"
+                    if [[ "$gpu_candidate_count" =~ ^[1-9][0-9]*$ ]] && [ "$gpu_mode_candidates" != '[]' ]; then
+                      gpu_parser_status=PASS_STRICT
+                    else
+                      gpu_parser_status=FAILED
+                      gpu_candidate_count=0
+                      gpu_mode_candidates='[]'
+                    fi
+                  elif [ "$gpu_parser_exit_code" -eq 3 ]; then
+                    gpu_parser_status=REJECTED_AMBIGUOUS
+                    gpu_candidate_count=0
+                    gpu_mode_candidates='[]'
+                    gpu_capability_discovery_status=AMBIGUOUS
+                  else
+                    gpu_parser_status=FAILED
+                    gpu_candidate_count=0
+                    gpu_mode_candidates='[]'
+                    gpu_capability_discovery_status=AMBIGUOUS
+                  fi
                 fi
               fi
-              if [ "$emulator_help_gpu_exit_code" -eq 0 ] && [ "$gpu_mode_candidates" != '[]' ]; then
+
+              if [ "$emulator_present_after" = YES ] &&
+                 [ "$gpu_help_interface_discovered" = YES ] &&
+                 [ "$emulator_help_gpu_attempted" = YES ] &&
+                 [ "$emulator_help_gpu_exit_code" -eq 0 ] &&
+                 [ "$gpu_evidence_projection_byte_count" -gt 0 ] &&
+                 [ "$gpu_evidence_projection_truncated" = NO ] &&
+                 [ "$gpu_evidence_projection_terminal_lf" = YES ] &&
+                 [[ "$gpu_evidence_projection_sha256" =~ ^[0-9a-f]{64}$ ]] &&
+                 [ "$gpu_parser_status" = PASS_STRICT ] &&
+                 [ "$gpu_candidate_count" -gt 0 ] &&
+                 [ "$gpu_evidence_projection_preserved" = YES ]; then
                 gpu_capability_discovery_status=OBSERVED
                 gpu_lock_evidence_ready=YES
-              elif [ "$emulator_help_gpu_exit_code" -eq 0 ] && [ -s "$gpu_help_output" ]; then
+              elif [ "$emulator_help_gpu_exit_code" -eq 0 ] && [ "$gpu_evidence_projection_byte_count" -gt 0 ]; then
                 gpu_capability_discovery_status=AMBIGUOUS
+              else
+                gpu_capability_discovery_status=UNAVAILABLE
               fi
             fi
           fi
@@ -436,8 +557,13 @@ jobs:
           printf 'EMULATOR_HELP_GPU_EXIT_CODE=%s\n' "$emulator_help_gpu_exit_code"
           printf 'GPU_CAPABILITY_DISCOVERY_STATUS=%s\n' "$gpu_capability_discovery_status"
           printf 'GPU_EVIDENCE_SOURCE=%s\n' "$gpu_evidence_source"
+          printf 'GPU_EVIDENCE_PROJECTION_PRESERVED=%s\n' "$gpu_evidence_projection_preserved"
+          printf 'GPU_EVIDENCE_PROJECTION_SHA256=%s\n' "$gpu_evidence_projection_sha256"
           printf 'GPU_EVIDENCE_SHA256=%s\n' "$gpu_evidence_sha256"
+          printf 'GPU_PARSER_STATUS=%s\n' "$gpu_parser_status"
+          printf 'GPU_PARSER_EXIT_CODE=%s\n' "$gpu_parser_exit_code"
           printf 'GPU_MODE_CANDIDATES=%s\n' "$gpu_mode_candidates"
+          printf 'GPU_CANDIDATE_COUNT=%s\n' "$gpu_candidate_count"
           printf 'GPU_LOCK_EVIDENCE_READY=%s\n' "$gpu_lock_evidence_ready"
 
           if [ "$sdk_root_status" = AMBIGUOUS ]; then

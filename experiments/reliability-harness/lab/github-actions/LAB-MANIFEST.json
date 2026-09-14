@@ -306,10 +306,29 @@
       "status": "NOT_RUN",
       "source": "CURRENT_EMULATOR_BINARY_READ_ONLY_HELP",
       "mode_selection": "NOT_PERFORMED",
+      "artifact_projection": {
+        "delimiter_begin": "GPU_EVIDENCE_PROJECTION_BEGIN",
+        "delimiter_end": "GPU_EVIDENCE_PROJECTION_END",
+        "maximum_bytes": 65536,
+        "terminal_lf_normalization": "APPEND_ONLY_WHEN_REQUIRED_BEFORE_HASH_AND_PARSING",
+        "sha256_field": "GPU_EVIDENCE_PROJECTION_SHA256",
+        "externally_reproducible_projection_required_for_ready": true
+      },
       "output_fields": [
         "GPU_CAPABILITY_DISCOVERY_STATUS",
+        "GPU_EVIDENCE_PROJECTION_SHA256",
+        "GPU_PARSER_STATUS",
         "GPU_MODE_CANDIDATES",
+        "GPU_CANDIDATE_COUNT",
         "GPU_LOCK_EVIDENCE_READY"
+      ],
+      "gpu_lock_evidence_ready_requires": [
+        "emulator present",
+        "GPU help interface discovered and executed successfully",
+        "non-empty untruncated projection with exact delimiters and SHA-256",
+        "PASS_STRICT parser result",
+        "normalized, sorted, deduplicated candidates with count greater than zero",
+        "projection preserved in the textual artifact source"
       ],
       "unavailable_or_ambiguous_affects_emulator_provision_pass": false
     }
