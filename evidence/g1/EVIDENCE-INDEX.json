@@ -552,6 +552,83 @@
       "artifact_retention_days": 1,
       "related_contract_clause": ["D-G1-LAB-02", "MISSÃO 05R-C / LAB DISCOVERY", "READY_FOR_E1_WAVE1"],
       "claim_envelope": "NOT_FOUND_IN_PATH does not assert absence from the filesystem. /dev/kvm presence does not establish KVM usability. The deliberate audit exit code 2 is not an infrastructure crash. P1-P10 remain UNKNOWN; partial P7 export/persistence evidence is not PASS. READY_FOR_E1_WAVE1 remains NO."
+    },
+    {
+      "evidence_id": "EVID-G1-0016",
+      "evidence_level": "GITHUB_ACTIONS_LAB_REMEDIATION_PROBE",
+      "device_or_emulator": "No Android guest; GitHub-hosted Ubuntu runner only",
+      "api": null,
+      "build_fingerprint": null,
+      "scenario": "E1_LAB_KVM_AND_ANDROID_TOOLING_REMEDIATION_PROBE",
+      "scheduling_strategy": "NOT_REACHED",
+      "preconditions": "Manual remediation workflow on canonical public repository at 9177b8f4653d348fd367ea8964ea02a29c85a9be; no Android package installation, API, system image, AVD, Android guest, adapter, P1-P10, Wave 1, E2, or G2 execution",
+      "permission_state": "contents:read",
+      "scheduled_time": null,
+      "captured_at_utc": "2026-09-14T19:15:02Z",
+      "repository": {
+        "visibility": "public",
+        "workflow_name": "E1 lab remediation probe",
+        "workflow_run_id": 34885736303,
+        "job_id": 104115831272,
+        "commit": "9177b8f4653d348fd367ea8964ea02a29c85a9be",
+        "run_conclusion": "success",
+        "workflow_permissions": "contents:read"
+      },
+      "event_timeline": [
+        "Start with /dev/kvm present but unreadable and unwritable to the runner user",
+        "Confirm non-interactive sudo and apply an ephemeral per-user R/W ACL with setfacl; mutation exits 0",
+        "Observe /dev/kvm readable and writable after the ephemeral mutation on that runner instance",
+        "Resolve sdkmanager, avdmanager, and adb inside /usr/local/lib/android/sdk",
+        "Do not find the emulator binary in the expected SDK root and do not run emulator -accel-check",
+        "Persist only the 1,018-byte remediation log as artifact 10364422791 with one-day retention",
+        "Classify the probe as SDK_TOOLING_NOT_FOUND without reaching API 36, AVD, Android guest, or E1"
+      ],
+      "metrics": {
+        "runner_environment": "github-hosted",
+        "runner_image": "ubuntu-24.04",
+        "runner_image_version": "20260907.300.1",
+        "scenario_executions": 0,
+        "p1_p10_pass_count": 0,
+        "p1_p10_unknown_count": 10,
+        "kvm_mutation_exit_code": 0,
+        "artifact_size_bytes": 1018
+      },
+      "environment": {
+        "runner_version": "2.337.0",
+        "host_os": "Ubuntu 24.04.5 LTS",
+        "android_sdk_root": "/usr/local/lib/android/sdk",
+        "android_home": "/usr/local/lib/android/sdk",
+        "tooling": {
+          "sdkmanager_location": "/usr/local/lib/android/sdk/cmdline-tools/latest/bin/sdkmanager",
+          "avdmanager_location": "/usr/local/lib/android/sdk/cmdline-tools/latest/bin/avdmanager",
+          "adb_location": "/usr/local/lib/android/sdk/platform-tools/adb",
+          "emulator_location": "NOT_FOUND",
+          "emulator_accel_check": "NOT_RUN_EMULATOR_NOT_FOUND"
+        },
+        "kvm": {
+          "device_present": true,
+          "readable_before": false,
+          "writable_before": false,
+          "sudo_noninteractive": true,
+          "mutation": "ATTEMPTED_EPHEMERAL_SETFACL_USER_RW",
+          "mutation_exit_code": 0,
+          "readable_after": true,
+          "writable_after": true,
+          "scope": "OBSERVED_ONLY_ON_THIS_EPHEMERAL_RUNNER_INSTANCE"
+        }
+      },
+      "result": "SDK_TOOLING_NOT_FOUND",
+      "severity": "S3_OBSERVABILITY_TOOLING",
+      "raw_log_reference": "GitHub Actions artifact 10364422791",
+      "artifact_id": 10364422791,
+      "artifact_sha256": "34fe3e8b8b416bd457006d0a5bfdb770b91f9c25c95a9ebed54fb9347556fdcb",
+      "artifact_retention_days": 1,
+      "related_contract_clause": [
+        "D-G1-LAB-02",
+        "MISSÃO 05R-D / EMULATOR PROVISIONING",
+        "READY_FOR_E1_WAVE1"
+      ],
+      "claim_envelope": "KVM R/W remediation is proven only for the observed ephemeral runner instance. sdkmanager, avdmanager, and adb were found; the current blocker is the absent emulator package/binary. This is not an API 36, system-image, AVD, P1-P10, or E1 failure. READY_FOR_E1_WAVE1 remains NO."
     }
   ]
 }

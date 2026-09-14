@@ -1,10 +1,10 @@
 {
   "schema_version": 2,
-  "manifest_id": "G1.3-MISSION-05R-C-LAB-DISCOVERY-20260914",
-  "status": "LAB_DISCOVERY_CONDITIONAL_REMEDIATION_PROBE_NOT_RUN",
-  "purpose": "Record the immutable public GitHub Actions lab discovery, its bounded remediation probe, and the publication-security posture; not an E1 scenario result",
-  "captured_at_utc": null,
-  "captured_at_utc_status": "NOT_PROVIDED_IN_IMMUTABLE_DISCOVERY_RECORD",
+  "manifest_id": "G1.3-MISSION-05R-D-EMULATOR-PROVISION-20260914",
+  "status": "LAB_DISCOVERY_CONDITIONAL_REMEDIATION_PROBE_SDK_TOOLING_NOT_FOUND_EMULATOR_PROVISION_NOT_RUN",
+  "purpose": "Record the immutable public GitHub Actions discovery and completed remediation probe, plus the bounded emulator-only provisioning probe; not an E1 scenario result",
+  "captured_at_utc": "2026-09-14T19:15:02Z",
+  "captured_at_utc_status": "GITHUB_ACTIONS_RUN_STARTED_AT",
   "financial_cost_incurred_usd": 0,
   "founder_authorization": {
     "repository_visibility": "PUBLIC",
@@ -18,7 +18,13 @@
     "external_paid_infrastructure_authorized": false,
     "artifacts_must_be_minimal": true,
     "artifact_retention_days": 1,
-    "sdk_system_images_or_avds_may_be_artifacts": false
+    "sdk_system_images_or_avds_may_be_artifacts": false,
+    "android_packages_authorized_for_next_probe": [
+      "emulator"
+    ],
+    "api36_provisioning_authorized_now": false,
+    "system_image_provisioning_authorized_now": false,
+    "avd_creation_authorized_now": false
   },
   "repository_preflight": {
     "authenticated_owner": "phpedrogarcia-afk",
@@ -33,7 +39,7 @@
     "root_workflow_present": true,
     "root_workflow_blob": "6eea5bf613ce7f94332ce131a874dced9c666152",
     "execution_binding": "PASS_PUBLIC_REPOSITORY_AND_ACTIONS",
-    "blocking_reason": "Discovery observed KVM device presence but did not prove KVM usability or Android tooling availability; remediation probe is the next bounded evidence-producing step"
+    "blocking_reason": "The remediation probe proved ephemeral KVM R/W and located sdkmanager, avdmanager, and adb on one runner instance; the emulator package/binary was not found, so emulator-only provisioning is the next bounded probe"
   },
   "zero_overage_guardrail": {
     "goal": "NO_PAID_RESOURCE_AUTHORIZATION",
@@ -140,12 +146,42 @@
   },
   "remediation_probe": {
     "workflow_path": ".github/workflows/e1-lab-remediation.yml",
-    "status": "NOT_RUN",
-    "scope": "KVM access and Android tooling resolution only; no Android API, system image, AVD, guest, adapter, P1-P10, Wave 1, E2, or G2",
+    "status": "SDK_TOOLING_NOT_FOUND",
+    "workflow_run_id": 34885736303,
+    "job_id": 104115831272,
+    "workflow_commit": "9177b8f4653d348fd367ea8964ea02a29c85a9be",
+    "run_conclusion": "success",
+    "scope": "KVM access and Android tooling resolution only; no Android package installation, API, system image, AVD, guest, adapter, P1-P10, Wave 1, E2, or G2",
+    "kvm": {
+      "device_present": true,
+      "readable_before": false,
+      "writable_before": false,
+      "sudo_noninteractive": true,
+      "mutation": "ATTEMPTED_EPHEMERAL_SETFACL_USER_RW",
+      "mutation_exit_code": 0,
+      "readable_after": true,
+      "writable_after": true,
+      "evidence_scope": "THIS_EPHEMERAL_RUNNER_INSTANCE_ONLY"
+    },
+    "android_sdk_root": "/usr/local/lib/android/sdk",
+    "android_home": "/usr/local/lib/android/sdk",
+    "android_tooling": {
+      "sdkmanager": "/usr/local/lib/android/sdk/cmdline-tools/latest/bin/sdkmanager",
+      "avdmanager": "/usr/local/lib/android/sdk/cmdline-tools/latest/bin/avdmanager",
+      "adb": "/usr/local/lib/android/sdk/platform-tools/adb",
+      "emulator": "NOT_FOUND",
+      "emulator_accel_check": "NOT_RUN_EMULATOR_NOT_FOUND"
+    },
+    "artifact_id": 10364422791,
+    "artifact_sha256": "34fe3e8b8b416bd457006d0a5bfdb770b91f9c25c95a9ebed54fb9347556fdcb",
+    "artifact_size_bytes": 1018,
+    "artifact_retention_days": 1,
+    "classification": "SDK_TOOLING_NOT_FOUND",
+    "claim_envelope": "Ephemeral KVM remediation is proven only for this runner instance. The observed blocker is the absent emulator package/binary, not API 36, a system image, an AVD, P1-P10, or E1.",
     "ready_for_e1_wave1": false
   },
   "api36_precheck": {
-    "classification": "NOT_RUN_PUBLIC_BINDING_READY",
+    "classification": "NOT_RUN_EMULATOR_PACKAGE_NOT_PROVISIONED",
     "cmdline_tools_revision": null,
     "platform_tools_revision": null,
     "emulator_revision": null,
@@ -185,7 +221,7 @@
       "action": "actions/upload-artifact",
       "owner": "GitHub",
       "version_or_sha": "043fb46d1a93c77aae656e7c1c64a875d1fc6a0a",
-      "purpose": "Persist small discovery or remediation-probe evidence outside the ephemeral runner",
+      "purpose": "Persist small discovery, remediation, or emulator-provision probe evidence outside the ephemeral runner",
       "trust_basis": "Official GitHub-maintained action, pinned to immutable commit"
     }
   ],
@@ -201,7 +237,7 @@
     "reliability_adapter_allowed": false,
     "e1_wave1_allowed": false,
     "ready_for_e1_wave1": false,
-    "reason": "LAB_DISCOVERY is CONDITIONAL, REMEDIATION_PROBE is NOT_RUN, and P1-P10 remain UNKNOWN; P7 has partial export/persistence evidence only and is not PASS"
+    "reason": "REMEDIATION_PROBE ended SDK_TOOLING_NOT_FOUND because the emulator package/binary was absent. EMULATOR_PROVISION_PROBE is NOT_RUN and P1-P10 remain UNKNOWN; API 36, system image, and AVD are not provisioned"
   },
   "sources": [
     "https://docs.github.com/billing/managing-billing-for-github-actions/about-billing-for-github-actions",
@@ -210,5 +246,19 @@
     "https://docs.github.com/en/actions/reference/runners/github-hosted-runners",
     "https://github.com/actions/runner-images/blob/main/images/ubuntu/Ubuntu2404-Readme.md",
     "https://developer.android.com/studio/run/emulator-acceleration"
-  ]
+  ],
+  "emulator_provision_probe": {
+    "workflow_path": ".github/workflows/e1-lab-emulator-provision.yml",
+    "status": "NOT_RUN",
+    "runner_label": "ubuntu-24.04",
+    "authorized_android_packages": [
+      "emulator"
+    ],
+    "api36_provisioning": "PROHIBITED_IN_THIS_PROBE",
+    "system_image_provisioning": "PROHIBITED_IN_THIS_PROBE",
+    "avd_creation": "PROHIBITED_IN_THIS_PROBE",
+    "global_license_acceptance": "PROHIBITED",
+    "artifact_policy": "SMALL_TEXT_LOG_ONLY_RETENTION_1_DAY",
+    "ready_for_e1_wave1": false
+  }
 }
