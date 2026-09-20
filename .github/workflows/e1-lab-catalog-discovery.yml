@@ -1,0 +1,45 @@
+name: E1 lab catalog discovery
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: e1-lab-catalog-discovery-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  catalog-discovery-probe:
+    name: Discover and record Android SDK catalog
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    env:
+      ALVORADA_REPOSITORY_VISIBILITY: ${{ github.event.repository.private && 'private' || 'public' }}
+      ALVORADA_WORKFLOW_PERMISSIONS: contents:read
+    steps:
+      - name: Checkout exact commit
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+
+      - name: Execute catalog discovery probe
+        working-directory: experiments/reliability-harness
+        shell: bash
+        run: |
+          set +e
+          ./scripts/audit-catalog-discovery.sh --ci 2>&1 | tee e1-lab-catalog-discovery.log
+          status=${PIPESTATUS[0]}
+          printf 'discovery_exit_code=%s\n' "$status" | tee -a e1-lab-catalog-discovery.log
+          exit "$status"
+
+      - name: Preserve catalog discovery artifacts
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: e1-lab-catalog-discovery-${{ github.sha }}-${{ github.run_id }}
+          path: |
+            experiments/reliability-harness/e1-lab-catalog-discovery.log
+            experiments/reliability-harness/raw_sdk_catalog.txt
+            experiments/reliability-harness/canonical_catalog_proposal.json
+          if-no-files-found: warn
+          retention-days: 1

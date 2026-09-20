@@ -5,6 +5,9 @@ Unit tests for ALVORADA Catalog Discovery Engine and Static Policy Verifier
 
 import os
 import sys
+import json
+import subprocess
+import tempfile
 import unittest
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
@@ -209,5 +212,64 @@ class TestStaticPolicyVerifier(unittest.TestCase):
         self.assertIn("UNAUTHORIZED_EMULATOR_ARGUMENTS", reason)
 
 
+class TestCliIntegration(unittest.TestCase):
+    def setUp(self):
+        self.script_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "catalog_discovery.py")
+
+    def test_cli_verify_script_valid(self):
+        with tempfile.NamedTemporaryFile("w", delete=False, suffix=".sh") as tmp:
+            tmp.write("#!/bin/bash\necho hello\n")
+            tmp_path = tmp.name
+
+        try:
+            res = subprocess.run([sys.executable, self.script_path, "verify-script", tmp_path], capture_output=True, text=True)
+            self.assertEqual(res.returncode, 0)
+            self.assertIn("STATIC_POLICY_VERIFICATION=PASS", res.stdout)
+        finally:
+            if os.path.exists(tmp_path):
+                os.remove(tmp_path)
+
+    def test_cli_verify_script_forbidden(self):
+        with tempfile.NamedTemporaryFile("w", delete=False, suffix=".sh") as tmp:
+            tmp.write("#!/bin/bash\nsdkmanager --licenses\n")
+            tmp_path = tmp.name
+
+        try:
+            res = subprocess.run([sys.executable, self.script_path, "verify-script", tmp_path], capture_output=True, text=True)
+            self.assertEqual(res.returncode, 1)
+            self.assertIn("STATIC_POLICY_VERIFICATION=FAIL", res.stdout)
+            self.assertIn("VIOLATION=PROHIBITED_LICENSE_ACCEPTANCE", res.stdout)
+        finally:
+            if os.path.exists(tmp_path):
+                os.remove(tmp_path)
+
+    def test_cli_parse_valid(self):
+        with tempfile.NamedTemporaryFile("w", delete=False, suffix=".txt") as in_tmp:
+            in_tmp.write(SAMPLE_VALID_SDKMANAGER_OUTPUT)
+            in_path = in_tmp.name
+
+        out_path = in_path + ".proposal.json"
+        try:
+            res = subprocess.run(
+                [sys.executable, self.script_path, "parse", "--input", in_path, "--output", out_path, "--repo-sha", "test-sha", "--run-id", "12345"],
+                capture_output=True,
+                text=True,
+            )
+            self.assertEqual(res.returncode, 0)
+            self.assertIn("PROPOSAL_SHA256=", res.stdout)
+            self.assertIn("READY_FOR_HUMAN_REVIEW=YES", res.stdout)
+            self.assertTrue(os.path.exists(out_path))
+            with open(out_path, "r", encoding="utf-8") as f:
+                data = json.load(f)
+            self.assertEqual(data["contract"], "ALVORADA_CATALOG_LOCK_PROPOSAL_V1")
+            self.assertEqual(data["metadata"]["repo_sha"], "test-sha")
+        finally:
+            if os.path.exists(in_path):
+                os.remove(in_path)
+            if os.path.exists(out_path):
+                os.remove(out_path)
+
+
 if __name__ == "__main__":
     unittest.main()
+

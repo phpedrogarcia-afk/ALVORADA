@@ -58,8 +58,9 @@ class CatalogParser:
     Extracts installed and available revisions strictly for the 5 HARD_LOCK packages.
     """
 
-    def __init__(self, raw_output: str):
+    def __init__(self, raw_output: str, metadata: Optional[Dict[str, str]] = None):
         self.raw_output = raw_output
+        self.metadata = metadata or {}
 
     def parse(self) -> Dict[str, Any]:
         """
@@ -150,6 +151,8 @@ class CatalogParser:
             "lock_approved": "NO",  # Mandatory: LOCK_APPROVED is always NO during discovery
             "packages": packages_projection,
         }
+        if self.metadata:
+            proposal["metadata"] = self.metadata
 
         proposal["proposal_sha256"] = hash_canonical_json_v1(proposal)
         return proposal
@@ -201,3 +204,91 @@ class StaticPolicyVerifier:
                 return True, None
             return False, "GPU_HELP_INTERFACE_NOT_PREVIOUSLY_PROVED"
         return False, f"UNAUTHORIZED_EMULATOR_ARGUMENTS: {args}"
+
+
+def main() -> None:
+    import argparse
+    import sys
+
+    parser = argparse.ArgumentParser(description="ALVORADA Catalog Discovery Engine & Static Policy Verifier")
+    subparsers = parser.add_subparsers(dest="subcommand", required=True)
+
+    # Subcommand: parse
+    parse_p = subparsers.add_parser("parse", help="Parse sdkmanager output into canonical lock proposal")
+    parse_p.add_argument("--input", "-i", required=True, help="Path to raw sdkmanager output (or '-' for stdin)")
+    parse_p.add_argument("--output", "-o", help="Path to write canonical JSON proposal")
+    parse_p.add_argument("--repo-sha", default="", help="Git SHA of repository")
+    parse_p.add_argument("--run-id", default="", help="CI Run ID")
+
+    # Subcommand: verify-script
+    verify_p = subparsers.add_parser("verify-script", help="Verify script against static safety policy")
+    verify_p.add_argument("script_path", help="Path to script file to verify (or '-' for stdin)")
+
+    # Subcommand: canonicalize
+    canon_p = subparsers.add_parser("canonicalize", help="Canonicalize JSON file and output SHA-256")
+    canon_p.add_argument("json_path", help="Path to JSON file")
+
+    args = parser.parse_args()
+
+    if args.subcommand == "parse":
+        if args.input == "-":
+            raw_text = sys.stdin.read()
+        else:
+            with open(args.input, "r", encoding="utf-8", errors="replace") as f:
+                raw_text = f.read()
+
+        meta = {}
+        if args.repo_sha:
+            meta["repo_sha"] = args.repo_sha
+        if args.run_id:
+            meta["run_id"] = args.run_id
+
+        parser_obj = CatalogParser(raw_text, metadata=meta)
+        proposal = parser_obj.parse()
+
+        canon_bytes = canonicalize_json_v1(proposal)
+
+        if args.output:
+            with open(args.output, "wb") as f:
+                f.write(canon_bytes)
+                f.write(b"\n")
+
+        print(f"PROPOSAL_SHA256={proposal['proposal_sha256']}")
+        print(f"READY_FOR_HUMAN_REVIEW={'YES' if proposal['ready_for_human_review'] else 'NO'}")
+        print(f"LOCK_APPROVED={proposal['lock_approved']}")
+        for pkg_name, pkg_info in sorted(proposal["packages"].items()):
+            print(f"PACKAGE:{pkg_name}:STATE={pkg_info['state']}:CATALOG={pkg_info.get('catalog_revision')}:INSTALLED={pkg_info.get('installed_revision')}")
+
+        sys.exit(0 if proposal["ready_for_human_review"] else 2)
+
+    elif args.subcommand == "verify-script":
+        if args.script_path == "-":
+            script_text = sys.stdin.read()
+        else:
+            with open(args.script_path, "r", encoding="utf-8", errors="replace") as f:
+                script_text = f.read()
+
+        verifier = StaticPolicyVerifier()
+        is_valid, violations = verifier.verify_script(script_text)
+        if is_valid:
+            print("STATIC_POLICY_VERIFICATION=PASS")
+            sys.exit(0)
+        else:
+            print("STATIC_POLICY_VERIFICATION=FAIL")
+            for v in violations:
+                print(f"VIOLATION={v}")
+            sys.exit(1)
+
+    elif args.subcommand == "canonicalize":
+        with open(args.json_path, "r", encoding="utf-8") as f:
+            data = json.load(f)
+        canon_bytes = canonicalize_json_v1(data)
+        h = hashlib.sha256(canon_bytes).hexdigest()
+        print(f"CANONICAL_SHA256={h}")
+        sys.stdout.buffer.write(canon_bytes)
+        sys.stdout.buffer.write(b"\n")
+        sys.exit(0)
+
+
+if __name__ == "__main__":
+    main()
