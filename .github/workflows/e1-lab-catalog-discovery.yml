@@ -2,6 +2,9 @@ name: E1 lab catalog discovery
 
 on:
   workflow_dispatch:
+  push:
+    branches:
+      - fio/autonomy-g1
 
 permissions:
   contents: read
