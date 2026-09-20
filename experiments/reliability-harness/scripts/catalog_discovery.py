@@ -206,6 +206,94 @@ class StaticPolicyVerifier:
         return False, f"UNAUTHORIZED_EMULATOR_ARGUMENTS: {args}"
 
 
+class Wave1PreflightVerifier:
+    """
+    Verifies that Wave 1 package provisioning conforms strictly to the
+    frozen catalog proposal and contract requirements of 05R-F.
+    """
+
+    EXPECTED_WAVE1_INSTALLS = [
+        "emulator",
+        "system-images;android-36;default;x86_64",
+    ]
+
+    EXPECTED_WAVE1_PREEXISTING = [
+        "build-tools;36.0.0",
+        "platform-tools",
+        "platforms;android-36",
+    ]
+
+    def __init__(self, proposal_path: str):
+        self.proposal_path = proposal_path
+
+    def verify_and_plan(self, enforce_approval: bool = False) -> Tuple[bool, Dict[str, Any], List[str]]:
+        """
+        Validates the proposal and produces the execution plan for Wave 1.
+        Returns (is_valid, plan_details, errors).
+        """
+        errors = []
+        try:
+            with open(self.proposal_path, "r", encoding="utf-8") as f:
+                proposal = json.load(f)
+        except Exception as e:
+            return False, {}, [f"FAILED_TO_READ_PROPOSAL: {e}"]
+
+        if proposal.get("contract") != "ALVORADA_CATALOG_LOCK_PROPOSAL_V1":
+            errors.append(f"INVALID_CONTRACT: {proposal.get('contract')}")
+
+        # Verify internal cryptographic payload hash
+        recorded_sha256 = proposal.get("proposal_sha256")
+        payload_without_sha = {k: v for k, v in proposal.items() if k != "proposal_sha256"}
+        computed_sha256 = hash_canonical_json_v1(payload_without_sha)
+
+        if recorded_sha256 != computed_sha256:
+            errors.append(f"HASH_MISMATCH: recorded={recorded_sha256} computed={computed_sha256}")
+
+        # Check approval status
+        lock_approved = proposal.get("lock_approved", "NO") == "YES"
+        if enforce_approval and not lock_approved:
+            errors.append("LOCK_NOT_APPROVED_BY_FOUNDER")
+
+        packages = proposal.get("packages", {})
+        required_installs = []
+        preexisting_verified = []
+
+        for pkg in HARD_LOCK_PACKAGES:
+            info = packages.get(pkg)
+            if not info:
+                errors.append(f"PACKAGE_MISSING_FROM_PROPOSAL: {pkg}")
+                continue
+
+            state = info.get("state")
+            cat_rev = info.get("catalog_revision")
+
+            if pkg in self.EXPECTED_WAVE1_INSTALLS:
+                if state != PACKAGE_STATE_ABSENT:
+                    errors.append(f"UNEXPECTED_STATE_FOR_WAVE1_INSTALL: {pkg} is {state}, expected {PACKAGE_STATE_ABSENT}")
+                required_installs.append({
+                    "package": pkg,
+                    "target_revision": cat_rev,
+                })
+            elif pkg in self.EXPECTED_WAVE1_PREEXISTING:
+                if state != PACKAGE_STATE_PRESENT_MATCHING:
+                    errors.append(f"UNEXPECTED_STATE_FOR_PREEXISTING: {pkg} is {state}, expected {PACKAGE_STATE_PRESENT_MATCHING}")
+                preexisting_verified.append({
+                    "package": pkg,
+                    "installed_revision": info.get("installed_revision"),
+                })
+
+        plan = {
+            "contract": "ALVORADA_WAVE1_PROVISIONING_PLAN_V1",
+            "proposal_sha256": computed_sha256,
+            "lock_approved": lock_approved,
+            "required_installs": required_installs,
+            "preexisting_verified": preexisting_verified,
+            "ready_for_execution": len(errors) == 0 and (lock_approved or not enforce_approval),
+        }
+
+        return len(errors) == 0, plan, errors
+
+
 def main() -> None:
     import argparse
     import sys
@@ -227,6 +315,11 @@ def main() -> None:
     # Subcommand: canonicalize
     canon_p = subparsers.add_parser("canonicalize", help="Canonicalize JSON file and output SHA-256")
     canon_p.add_argument("json_path", help="Path to JSON file")
+
+    # Subcommand: wave1-preflight
+    wave1_p = subparsers.add_parser("wave1-preflight", help="Validate catalog lock proposal and generate Wave 1 plan")
+    wave1_p.add_argument("--proposal", "-p", required=True, help="Path to canonical_catalog_proposal.json")
+    wave1_p.add_argument("--enforce-approval", action="store_true", help="Fail closed if lock_approved is not YES")
 
     args = parser.parse_args()
 
@@ -288,6 +381,26 @@ def main() -> None:
         sys.stdout.buffer.write(canon_bytes)
         sys.stdout.buffer.write(b"\n")
         sys.exit(0)
+
+    elif args.subcommand == "wave1-preflight":
+        verifier = Wave1PreflightVerifier(args.proposal)
+        is_valid, plan, errors = verifier.verify_and_plan(enforce_approval=args.enforce_approval)
+        print(f"WAVE1_VALID={'YES' if is_valid else 'NO'}")
+        if is_valid:
+            print(f"WAVE1_LOCK_APPROVED={'YES' if plan['lock_approved'] else 'NO'}")
+            print(f"WAVE1_PROPOSAL_SHA256={plan['proposal_sha256']}")
+            install_pkgs = " ".join(item["package"] for item in plan["required_installs"])
+            print(f"WAVE1_INSTALL_PACKAGES={install_pkgs}")
+            for item in plan["required_installs"]:
+                print(f"WAVE1_TARGET:{item['package']}:REV={item['target_revision']}")
+            for item in plan["preexisting_verified"]:
+                print(f"WAVE1_PREEXISTING:{item['package']}:INSTALLED={item['installed_revision']}")
+            print(f"WAVE1_READY_FOR_EXECUTION={'YES' if plan['ready_for_execution'] else 'NO'}")
+            sys.exit(0 if plan['ready_for_execution'] else 2)
+        else:
+            for err in errors:
+                print(f"ERROR={err}")
+            sys.exit(2)
 
 
 if __name__ == "__main__":

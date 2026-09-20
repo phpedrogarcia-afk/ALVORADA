@@ -17,6 +17,7 @@ from catalog_discovery import (
     hash_canonical_json_v1,
     CatalogParser,
     StaticPolicyVerifier,
+    Wave1PreflightVerifier,
     PACKAGE_STATE_ABSENT,
     PACKAGE_STATE_PRESENT_MATCHING,
     PACKAGE_STATE_PRESENT_DIFFERENT,
@@ -268,6 +269,49 @@ class TestCliIntegration(unittest.TestCase):
                 os.remove(in_path)
             if os.path.exists(out_path):
                 os.remove(out_path)
+
+
+class TestWave1PreflightVerifier(unittest.TestCase):
+    def setUp(self):
+        self.canonical_proposal_path = os.path.abspath(
+            os.path.join(os.path.dirname(os.path.abspath(__file__)), "../../..", "evidence/g1/raw-mission05r/canonical_catalog_proposal.json")
+        )
+
+    def test_canonical_proposal_preflight(self):
+        verifier = Wave1PreflightVerifier(self.canonical_proposal_path)
+        is_valid, plan, errors = verifier.verify_and_plan(enforce_approval=False)
+        self.assertTrue(is_valid)
+        self.assertEqual(len(errors), 0)
+        self.assertFalse(plan["lock_approved"])
+        self.assertEqual(plan["proposal_sha256"], "55087ef875573c7204251cd22ddd5fa92dd35b98321d95bcf41e60bddcc50d9f")
+        self.assertEqual(len(plan["required_installs"]), 2)
+        pkgs = [item["package"] for item in plan["required_installs"]]
+        self.assertIn("emulator", pkgs)
+        self.assertIn("system-images;android-36;default;x86_64", pkgs)
+
+    def test_enforce_approval_rejects_unapproved(self):
+        verifier = Wave1PreflightVerifier(self.canonical_proposal_path)
+        is_valid, plan, errors = verifier.verify_and_plan(enforce_approval=True)
+        self.assertFalse(is_valid)
+        self.assertIn("LOCK_NOT_APPROVED_BY_FOUNDER", errors)
+
+    def test_tampered_hash_rejection(self):
+        with open(self.canonical_proposal_path, "r", encoding="utf-8") as f:
+            data = json.load(f)
+
+        data["proposal_sha256"] = "corrupted_sha256_hash_123456789"
+        with tempfile.NamedTemporaryFile("w", delete=False, suffix=".json") as tmp:
+            json.dump(data, tmp)
+            tmp_path = tmp.name
+
+        try:
+            verifier = Wave1PreflightVerifier(tmp_path)
+            is_valid, plan, errors = verifier.verify_and_plan()
+            self.assertFalse(is_valid)
+            self.assertTrue(any("HASH_MISMATCH" in err for err in errors))
+        finally:
+            if os.path.exists(tmp_path):
+                os.remove(tmp_path)
 
 
 if __name__ == "__main__":
