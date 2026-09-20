@@ -187,6 +187,32 @@ jobs:
           printf 'KVM_AFTER_READABLE=%s\n' "$kvm_after_readable"
           printf 'KVM_AFTER_WRITABLE=%s\n' "$kvm_after_writable"
 
+          pulse_library_present_before=NO
+          if ldconfig -p 2>/dev/null | grep -q 'libpulse\.so\.0' || [ -f /usr/lib/x86_64-linux-gnu/libpulse.so.0 ]; then
+            pulse_library_present_before=YES
+          fi
+          printf 'PULSE_LIBRARY_PRESENT_BEFORE=%s\n' "$pulse_library_present_before"
+
+          pulse_mutation=NOT_NEEDED
+          pulse_mutation_exit_code=NOT_RUN
+          if [ "$pulse_library_present_before" = NO ]; then
+            if [ "$sudo_noninteractive" != YES ]; then
+              pulse_mutation=NOT_ATTEMPTED_SUDO_NONINTERACTIVE_UNAVAILABLE
+            else
+              pulse_mutation=ATTEMPTED_EPHEMERAL_APT_LIBPULSE0
+              sudo apt-get update -y && sudo apt-get install -y --no-install-recommends libpulse0
+              pulse_mutation_exit_code=$?
+            fi
+          fi
+          printf 'PULSE_MUTATION=%s\n' "$pulse_mutation"
+          printf 'PULSE_MUTATION_EXIT_CODE=%s\n' "$pulse_mutation_exit_code"
+
+          pulse_library_present_after=NO
+          if ldconfig -p 2>/dev/null | grep -q 'libpulse\.so\.0' || [ -f /usr/lib/x86_64-linux-gnu/libpulse.so.0 ]; then
+            pulse_library_present_after=YES
+          fi
+          printf 'PULSE_LIBRARY_PRESENT_AFTER=%s\n' "$pulse_library_present_after"
+
           emulator_install_attempted=NO
           emulator_install_reason=NOT_NEEDED
           emulator_install_exit_code=NOT_RUN
