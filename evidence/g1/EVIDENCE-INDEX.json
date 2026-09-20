@@ -629,6 +629,70 @@
         "READY_FOR_E1_WAVE1"
       ],
       "claim_envelope": "KVM R/W remediation is proven only for the observed ephemeral runner instance. sdkmanager, avdmanager, and adb were found; the current blocker is the absent emulator package/binary. This is not an API 36, system-image, AVD, P1-P10, or E1 failure. READY_FOR_E1_WAVE1 remains NO."
+    },
+    {
+      "evidence_id": "EVID-G1-0017",
+      "evidence_level": "GITHUB_ACTIONS_LAB_CATALOG_DISCOVERY_PROBE",
+      "device_or_emulator": "No Android guest; GitHub-hosted Ubuntu runner only",
+      "api": null,
+      "build_fingerprint": null,
+      "scenario": "E1_LAB_ANDROID_SDK_CATALOG_DISCOVERY_PROBE",
+      "scheduling_strategy": "NOT_REACHED",
+      "preconditions": "Read-only catalog discovery workflow on autonomous branch fio/autonomy-g1 at 059bd29bd191d5430480c0398f63387b01d866d4; zero package installation, license acceptance, or AVD creation",
+      "permission_state": "contents:read",
+      "scheduled_time": null,
+      "captured_at_utc": "2026-09-20T22:01:19Z",
+      "repository": {
+        "visibility": "public",
+        "workflow_name": "E1 lab catalog discovery",
+        "workflow_run_id": 35540374123,
+        "job_id": 106156808636,
+        "commit": "059bd29bd191d5430480c0398f63387b01d866d4",
+        "run_conclusion": "success",
+        "workflow_permissions": "contents:read"
+      },
+      "event_timeline": [
+        "Statically verify script against StaticPolicyVerifier with zero violations",
+        "Run 12 unit and CLI integration tests in runner; all pass in 0.118s",
+        "Execute read-only sdkmanager --list --verbose --channel=0 query; exit code 0",
+        "Parse output strictly projecting the 5 HARD_LOCK packages",
+        "Observe build-tools;36.0.0, platform-tools 37.0.1, and platforms;android-36 rev 2 already installed in base image",
+        "Observe emulator 37.1.11 and system-images;android-36;default;x86_64 rev 2 present in catalog but absent from runner",
+        "Generate ALVORADA_CANONICAL_JSON_V1 proposal with payload SHA-256 55087ef875573c7204251cd22ddd5fa92dd35b98321d95bcf41e60bddcc50d9f",
+        "Persist 8,144-byte artifact 10614013929 containing proposal JSON, raw SDK catalog, and execution log",
+        "Set READY_FOR_HUMAN_REVIEW=YES and LOCK_APPROVED=NO"
+      ],
+      "metrics": {
+        "runner_environment": "github-hosted",
+        "runner_image": "ubuntu-24.04",
+        "scenario_executions": 0,
+        "p1_p10_pass_count": 0,
+        "p1_p10_unknown_count": 10,
+        "discovery_query_exit_code": 0,
+        "proposal_payload_sha256": "55087ef875573c7204251cd22ddd5fa92dd35b98321d95bcf41e60bddcc50d9f",
+        "artifact_size_bytes": 8144
+      },
+      "environment": {
+        "host_os": "Ubuntu 24.04.5 LTS",
+        "android_sdk_root": "/usr/local/lib/android/sdk",
+        "android_home": "/usr/local/lib/android/sdk",
+        "tooling": {
+          "sdkmanager_location": "/usr/local/lib/android/sdk/cmdline-tools/latest/bin/sdkmanager",
+          "catalog_parser": "experiments/reliability-harness/scripts/catalog_discovery.py"
+        }
+      },
+      "result": "CATALOG_DISCOVERY_PASS",
+      "severity": null,
+      "raw_log_reference": "GitHub Actions artifact 10614013929",
+      "artifact_id": 10614013929,
+      "artifact_sha256": "a8c741a7b2aa1d84df230504bba597f07dd8bac40fe16f4f28721a76b3fd2d1d",
+      "artifact_retention_days": 1,
+      "related_contract_clause": [
+        "05R-E-CATALOG-DESIGN-R1",
+        "ALVORADA_CATALOG_LOCK_PROPOSAL_V1",
+        "READY_FOR_E1_WAVE1"
+      ],
+      "claim_envelope": "Catalog discovery is proven strictly read-only on ubuntu-24.04 runner. 3 of 5 HARD_LOCK packages are preinstalled; 2 packages are absent. Proposal SHA-256 is 55087ef875573c7204251cd22ddd5fa92dd35b98321d95bcf41e60bddcc50d9f. LOCK_APPROVED remains NO awaiting human review. READY_FOR_E1_WAVE1 remains NO."
     }
   ]
 }
