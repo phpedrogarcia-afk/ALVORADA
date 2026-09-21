@@ -298,6 +298,137 @@ class Wave1PreflightVerifier:
         return len(errors) == 0, plan, errors
 
 
+class Wave2AvdConfigurator:
+    """
+    Defines and verifies the canonical AVD hardware profile, creation syntax,
+    and headless launch flags for Wave 2 (05R-G).
+    """
+
+    CANONICAL_AVD_NAME = "alvorada_e1_api36_x86_64"
+    CANONICAL_PACKAGE = "system-images;android-36;default;x86_64"
+    CANONICAL_TAG = "default"
+    CANONICAL_ABI = "x86_64"
+
+    # Host budget ceilings for standard GitHub-hosted runner (4 vCPU, 16 GB RAM)
+    MAX_ALLOWED_RAM_MB = 3072
+    MAX_ALLOWED_CPU_CORES = 2
+
+    CANONICAL_HARDWARE_CONFIG = {
+        "AvdId": CANONICAL_AVD_NAME,
+        "avd.ini.displayname": "Alvorada E1 API 36 x86_64",
+        "abi.type": CANONICAL_ABI,
+        "tag.id": CANONICAL_TAG,
+        "tag.display": "Default Android System Image",
+        "hw.cpu.arch": "x86_64",
+        "hw.cpu.ncore": "2",
+        "hw.ramSize": "2048",
+        "vm.heapSize": "256",
+        "hw.lcd.density": "420",
+        "hw.lcd.width": "1080",
+        "hw.lcd.height": "2400",
+        "hw.gpu.enabled": "yes",
+        "hw.gpu.mode": "swiftshader_indirect",
+        "hw.keyboard": "yes",
+        "hw.audioInput": "no",
+        "hw.audioOutput": "yes",
+        "hw.camera.back": "none",
+        "hw.camera.front": "none",
+        "disk.dataPartition.size": "2048M",
+        "PlayStore.enabled": "false",
+        "image.sysdir.1": "system-images/android-36/default/x86_64/",
+    }
+
+    CANONICAL_EMULATOR_ARGS = [
+        "-avd", CANONICAL_AVD_NAME,
+        "-no-window",
+        "-no-boot-anim",
+        "-no-snapshot",
+        "-wipe-data",
+        "-gpu", "swiftshader_indirect",
+        "-accel", "on",
+        "-timezone", "America/Sao_Paulo",
+        "-camera-back", "none",
+        "-camera-front", "none",
+    ]
+
+    @classmethod
+    def get_canonical_config(cls) -> Dict[str, str]:
+        return dict(cls.CANONICAL_HARDWARE_CONFIG)
+
+    @classmethod
+    def get_create_command_args(cls, device_profile: str = "pixel") -> List[str]:
+        return [
+            "avdmanager", "create", "avd",
+            "--name", cls.CANONICAL_AVD_NAME,
+            "--package", cls.CANONICAL_PACKAGE,
+            "--tag", cls.CANONICAL_TAG,
+            "--abi", cls.CANONICAL_ABI,
+            "--device", device_profile,
+            "--force",
+        ]
+
+    @classmethod
+    def get_headless_launch_args(cls) -> List[str]:
+        return list(cls.CANONICAL_EMULATOR_ARGS)
+
+    @classmethod
+    def verify_config(cls, config: Dict[str, str]) -> Tuple[bool, List[str]]:
+        errors = []
+        ram_str = config.get("hw.ramSize", "0")
+        try:
+            ram_mb = int(ram_str)
+            if ram_mb > cls.MAX_ALLOWED_RAM_MB:
+                errors.append(f"RAM_EXCEEDS_HOST_BUDGET: {ram_mb}MB > {cls.MAX_ALLOWED_RAM_MB}MB")
+            elif ram_mb < 1024:
+                errors.append(f"RAM_INSUFFICIENT_FOR_API36: {ram_mb}MB < 1024MB")
+        except ValueError:
+            errors.append(f"INVALID_RAM_VALUE: {ram_str}")
+
+        cpu_str = config.get("hw.cpu.ncore", "0")
+        try:
+            cpu_cores = int(cpu_str)
+            if cpu_cores > cls.MAX_ALLOWED_CPU_CORES:
+                errors.append(f"CPU_CORES_EXCEED_HOST_BUDGET: {cpu_cores} > {cls.MAX_ALLOWED_CPU_CORES}")
+            elif cpu_cores < 1:
+                errors.append(f"INVALID_CPU_CORES: {cpu_cores}")
+        except ValueError:
+            errors.append(f"INVALID_CPU_VALUE: {cpu_str}")
+
+        if config.get("abi.type") != cls.CANONICAL_ABI:
+            errors.append(f"WRONG_ABI: {config.get('abi.type')} != {cls.CANONICAL_ABI}")
+
+        if config.get("tag.id") != cls.CANONICAL_TAG:
+            errors.append(f"WRONG_TAG: {config.get('tag.id')} != {cls.CANONICAL_TAG}")
+
+        allowed_gpu = {"swiftshader_indirect", "off", "auto-no-window"}
+        gpu_mode = config.get("hw.gpu.mode")
+        if gpu_mode not in allowed_gpu:
+            errors.append(f"DISALLOWED_GPU_MODE: {gpu_mode}")
+
+        return len(errors) == 0, errors
+
+    @classmethod
+    def generate_specification_summary(cls) -> Dict[str, Any]:
+        return {
+            "contract": "ALVORADA_WAVE2_AVD_SPECIFICATION_V1",
+            "avd_name": cls.CANONICAL_AVD_NAME,
+            "target_package": cls.CANONICAL_PACKAGE,
+            "abi": cls.CANONICAL_ABI,
+            "tag": cls.CANONICAL_TAG,
+            "api_level": 36,
+            "resource_budget": {
+                "guest_ram_mb": 2048,
+                "guest_vcpus": 2,
+                "host_ram_headroom_mb": 14336,
+                "host_vcpu_headroom": 2,
+                "disk_data_partition": "2048M",
+            },
+            "create_command": " ".join(cls.get_create_command_args()),
+            "launch_command": "emulator " + " ".join(cls.get_headless_launch_args()),
+            "hardware_config": cls.get_canonical_config(),
+        }
+
+
 def main() -> None:
     import argparse
     import sys
@@ -328,6 +459,10 @@ def main() -> None:
     # Subcommand: approve-lock
     approve_p = subparsers.add_parser("approve-lock", help="Founder tool: approve canonical catalog lock proposal")
     approve_p.add_argument("--proposal", "-p", required=True, help="Path to canonical_catalog_proposal.json")
+
+    # Subcommand: wave2-avd-spec
+    wave2_p = subparsers.add_parser("wave2-avd-spec", help="Output canonical Wave 2 AVD specification JSON")
+    wave2_p.add_argument("--pretty", action="store_true", help="Format JSON with indentation")
 
     args = parser.parse_args()
 
@@ -435,6 +570,16 @@ def main() -> None:
         print("LOCK_APPROVED=YES")
         print(f"PROPOSAL_SHA256={proposal['proposal_sha256']}")
         print("STATUS=READY_FOR_WAVE1_EXECUTION")
+        sys.exit(0)
+
+    elif args.subcommand == "wave2-avd-spec":
+        spec = Wave2AvdConfigurator.generate_specification_summary()
+        if args.pretty:
+            print(json.dumps(spec, indent=2))
+        else:
+            canon_bytes = canonicalize_json_v1(spec)
+            sys.stdout.buffer.write(canon_bytes)
+            sys.stdout.buffer.write(b"\n")
         sys.exit(0)
 
 

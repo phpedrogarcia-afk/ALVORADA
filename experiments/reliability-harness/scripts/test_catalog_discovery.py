@@ -18,6 +18,7 @@ from catalog_discovery import (
     CatalogParser,
     StaticPolicyVerifier,
     Wave1PreflightVerifier,
+    Wave2AvdConfigurator,
     PACKAGE_STATE_ABSENT,
     PACKAGE_STATE_PRESENT_MATCHING,
     PACKAGE_STATE_PRESENT_DIFFERENT,
@@ -378,6 +379,77 @@ class TestWave1PreflightVerifier(unittest.TestCase):
         finally:
             if os.path.exists(tmp_path):
                 os.remove(tmp_path)
+
+
+class TestWave2AvdConfigurator(unittest.TestCase):
+    def test_wave2_canonical_constants(self):
+        self.assertEqual(Wave2AvdConfigurator.CANONICAL_AVD_NAME, "alvorada_e1_api36_x86_64")
+        self.assertEqual(Wave2AvdConfigurator.CANONICAL_PACKAGE, "system-images;android-36;default;x86_64")
+        self.assertEqual(Wave2AvdConfigurator.CANONICAL_TAG, "default")
+        self.assertEqual(Wave2AvdConfigurator.CANONICAL_ABI, "x86_64")
+
+    def test_wave2_create_command_args(self):
+        cmd = Wave2AvdConfigurator.get_create_command_args("pixel")
+        self.assertIn("avdmanager", cmd)
+        self.assertIn("alvorada_e1_api36_x86_64", cmd)
+        self.assertIn("system-images;android-36;default;x86_64", cmd)
+        self.assertIn("--force", cmd)
+
+    def test_wave2_headless_launch_args(self):
+        args = Wave2AvdConfigurator.get_headless_launch_args()
+        self.assertIn("-no-window", args)
+        self.assertIn("-no-boot-anim", args)
+        self.assertIn("-no-snapshot", args)
+        self.assertIn("-wipe-data", args)
+        self.assertIn("-gpu", args)
+        self.assertIn("swiftshader_indirect", args)
+        self.assertIn("-accel", args)
+        self.assertIn("on", args)
+
+    def test_wave2_canonical_config_valid(self):
+        cfg = Wave2AvdConfigurator.get_canonical_config()
+        ok, errors = Wave2AvdConfigurator.verify_config(cfg)
+        self.assertTrue(ok, f"Expected canonical config to be valid, got: {errors}")
+        self.assertEqual(len(errors), 0)
+
+    def test_wave2_verify_config_excessive_ram(self):
+        cfg = Wave2AvdConfigurator.get_canonical_config()
+        cfg["hw.ramSize"] = "4096"
+        ok, errors = Wave2AvdConfigurator.verify_config(cfg)
+        self.assertFalse(ok)
+        self.assertTrue(any("RAM_EXCEEDS_HOST_BUDGET" in e for e in errors))
+
+    def test_wave2_verify_config_excessive_cpu(self):
+        cfg = Wave2AvdConfigurator.get_canonical_config()
+        cfg["hw.cpu.ncore"] = "4"
+        ok, errors = Wave2AvdConfigurator.verify_config(cfg)
+        self.assertFalse(ok)
+        self.assertTrue(any("CPU_CORES_EXCEED_HOST_BUDGET" in e for e in errors))
+
+    def test_wave2_verify_config_wrong_abi(self):
+        cfg = Wave2AvdConfigurator.get_canonical_config()
+        cfg["abi.type"] = "arm64-v8a"
+        ok, errors = Wave2AvdConfigurator.verify_config(cfg)
+        self.assertFalse(ok)
+        self.assertTrue(any("WRONG_ABI" in e for e in errors))
+
+    def test_wave2_verify_config_wrong_tag(self):
+        cfg = Wave2AvdConfigurator.get_canonical_config()
+        cfg["tag.id"] = "google_apis"
+        ok, errors = Wave2AvdConfigurator.verify_config(cfg)
+        self.assertFalse(ok)
+        self.assertTrue(any("WRONG_TAG" in e for e in errors))
+
+    def test_cli_wave2_avd_spec(self):
+        script_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "catalog_discovery.py")
+        res = subprocess.run([sys.executable, script_path, "wave2-avd-spec", "--pretty"], capture_output=True, text=True)
+        self.assertEqual(res.returncode, 0)
+        data = json.loads(res.stdout)
+        self.assertEqual(data["contract"], "ALVORADA_WAVE2_AVD_SPECIFICATION_V1")
+        self.assertEqual(data["avd_name"], "alvorada_e1_api36_x86_64")
+        self.assertEqual(data["target_package"], "system-images;android-36;default;x86_64")
+        self.assertEqual(data["resource_budget"]["guest_ram_mb"], 2048)
+        self.assertEqual(data["resource_budget"]["guest_vcpus"], 2)
 
 
 if __name__ == "__main__":
