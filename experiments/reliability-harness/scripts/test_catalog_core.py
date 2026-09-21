@@ -1,13 +1,17 @@
 #!/usr/bin/env python3
 """
 ALVORADA — Comprehensive Unit & Adversarial Test Suite for Catalog Core Contracts
-Contract Version: RECOVERY-G1-001
+Contract Version: RECOVERY-G1-001-R1
 
 Validates:
-1. ALVORADA_CANONICAL_JSON_V1 test vectors (A through G) with STATIC SHA-256 FIXTURES.
-2. Type safety and boundary negatives (NaN, Infinity, integer overflow/underflow, surrogates, timestamps, sets).
-3. CatalogParser fail-closed states and independent revision tracking.
-4. CatalogReadOnlyPolicy adversarial command rejection across whitespace, paths, quotes, and continuations.
+1. ALVORADA_CANONICAL_JSON_V1 test vectors (A through G + control-character vector) with STATIC SHA-256 FIXTURES.
+2. Independent second-path verification of static fixtures (Vector A & control-character vector).
+3. Exact control character escaping (\\u00xx lowercase hex for U+0000..U+001F, no short escapes).
+4. Duplicate object key rejection at root, nested, and array-nested levels (DUPLICATE_OBJECT_KEY).
+5. Explicit timestamp validation contract (primitive implemented, no heuristic auto-enforcement).
+6. CatalogParser fail-closed states and independent revision tracking.
+7. CatalogReadOnlyPolicy structural sdkmanager allowlist and adversarial command rejection across
+   positional arguments, unknown flags, whitespace, paths, quotes, and continuations.
 """
 
 import hashlib
@@ -25,6 +29,8 @@ from catalog_core import (
     MAX_SAFE_INTEGER,
     validate_canonical_timestamp,
     validate_canonical_data,
+    escape_canonical_string,
+    serialize_canonical_json_v1,
     canonicalize_json_v1,
     hash_canonical_json_v1,
     json_loads_canonical,
@@ -56,6 +62,9 @@ class TestCanonicalJsonV1Vectors(unittest.TestCase):
     FIXTURE_VECTOR_E1 = "9285613f3642b142c4c9fa14b3f5edc943f949903d8313aa7a782312b691e112"
     FIXTURE_VECTOR_E2 = "cb005fd1af5f9ca93c3fd45ed4fb104ff32f5625911fafc10c8206dd3de16584"
     FIXTURE_VECTOR_F = "8df60e472cc1a89ed125d15211872fc554925315820efba26940084b4772b383"
+    FIXTURE_VECTOR_CTRL = "0a4b3e579e1a73bb140a33ca3a33732dc4768738cbfd5b24734e0c23e2946103"
+
+    EXPECTED_CTRL_BYTES = b'{"control_str":"\\u0000\\u0008\\u0009\\u000a\\u000c\\u000d\\u001f\\"\\\\\xc3\xa7","id":"vector_ctrl_001"}'
 
     def test_vector_a_deterministic_key_sorting(self):
         """Vector A: Keys in different orders must produce identical bytes and static digest."""
@@ -149,6 +158,28 @@ class TestCanonicalJsonV1Vectors(unittest.TestCase):
         self.assertEqual(bytes1, bytes2)
         self.assertEqual(hash_canonical_json_v1(proj1), self.FIXTURE_VECTOR_F)
 
+    def test_vector_control_characters_exact_escaping(self):
+        """Control-Char Vector: U+0000..U+001F strictly \\u00xx lowercase, quote, backslash, non-ASCII."""
+        data = {
+            "control_str": "\x00\x08\x09\x0a\x0c\x0d\x1f\"\\ç",
+            "id": "vector_ctrl_001",
+        }
+        canon_bytes = canonicalize_json_v1(data)
+
+        # Must match exact expected canonical bytes
+        self.assertEqual(canon_bytes, self.EXPECTED_CTRL_BYTES)
+
+        # Must NOT contain short escapes (\b, \t, \n, \f, \r)
+        self.assertNotIn(b'\\b', canon_bytes)
+        self.assertNotIn(b'\\t', canon_bytes)
+        self.assertNotIn(b'\\n', canon_bytes)
+        self.assertNotIn(b'\\f', canon_bytes)
+        self.assertNotIn(b'\\r', canon_bytes)
+
+        # Must match exact pre-computed static SHA-256 fixture
+        digest = hash_canonical_json_v1(data)
+        self.assertEqual(digest, self.FIXTURE_VECTOR_CTRL)
+
     def test_vector_g_float_rejection(self):
         """Vector G: Floats must fail closed with ValueError."""
         with self.assertRaises(ValueError):
@@ -167,8 +198,72 @@ class TestCanonicalJsonV1Vectors(unittest.TestCase):
             json_loads_canonical('{"val": 1e10}')
 
 
+class TestIndependentFixtureVerification(unittest.TestCase):
+    """
+    Section 9: Verifies that static fixtures for Vector A and the Control-Character
+    Vector are verified via an independent second path without importing or calling
+    canonicalization routines, preventing self-consistent wrong implementations.
+    """
+
+    def test_independent_second_path_vector_a(self):
+        """Independent second-path computation for Vector A."""
+        # Manually constructed byte representation of Vector A
+        independent_bytes = b'{"a":2,"m":{"k1":"v1","k2":"v2"},"z":1}'
+        independent_sha = hashlib.sha256(independent_bytes).hexdigest()
+
+        self.assertEqual(
+            independent_sha,
+            TestCanonicalJsonV1Vectors.FIXTURE_VECTOR_A,
+            "Independent second path for Vector A diverged from fixture",
+        )
+
+    def test_independent_second_path_control_vector(self):
+        """Independent second-path computation for Control-Character Vector."""
+        # Low-level manual byte builder:
+        # Key 1: "control_str"
+        # Escapes: \u0000, \u0008, \u0009, \u000a, \u000c, \u000d, \u001f, \", \\, ç (\xc3\xa7)
+        # Key 2: "id": "vector_ctrl_001"
+        builder = bytearray()
+        builder.extend(b'{"control_str":"')
+        builder.extend(b'\\u0000\\u0008\\u0009\\u000a\\u000c\\u000d\\u001f')
+        builder.extend(b'\\"\\\\')
+        builder.extend('ç'.encode('utf-8'))
+        builder.extend(b'","id":"vector_ctrl_001"}')
+
+        independent_bytes = bytes(builder)
+        independent_sha = hashlib.sha256(independent_bytes).hexdigest()
+
+        self.assertEqual(independent_bytes, TestCanonicalJsonV1Vectors.EXPECTED_CTRL_BYTES)
+        self.assertEqual(
+            independent_sha,
+            TestCanonicalJsonV1Vectors.FIXTURE_VECTOR_CTRL,
+            "Independent second path for Control Vector diverged from fixture",
+        )
+
+
 class TestCanonicalJsonTypeSafetyNegatives(unittest.TestCase):
-    """Negative tests enforcing mathematical boundaries and type restrictions."""
+    """Negative tests enforcing mathematical boundaries, duplicate keys, and type restrictions."""
+
+    def test_duplicate_object_keys_rejected(self):
+        """R1-03: Duplicate JSON keys at root, nested, and array-nested levels must fail closed."""
+        # Root duplicate
+        with self.assertRaises(ValueError) as ctx:
+            json_loads_canonical('{"a":1,"a":2}')
+        self.assertIn("DUPLICATE_OBJECT_KEY", str(ctx.exception))
+
+        # Nested duplicate
+        with self.assertRaises(ValueError) as ctx:
+            json_loads_canonical('{"x":{"a":1,"a":2}}')
+        self.assertIn("DUPLICATE_OBJECT_KEY", str(ctx.exception))
+
+        # Deep nested duplicate inside array
+        with self.assertRaises(ValueError) as ctx:
+            json_loads_canonical('{"items":[{"id":1},{"field":"first","field":"second"}]}')
+        self.assertIn("DUPLICATE_OBJECT_KEY", str(ctx.exception))
+
+        # Valid distinct keys pass
+        valid_res = json_loads_canonical('{"x":{"a":1,"b":2},"y":3}')
+        self.assertEqual(valid_res, {"x": {"a": 1, "b": 2}, "y": 3})
 
     def test_nan_rejection(self):
         """NaN must fail closed."""
@@ -194,7 +289,6 @@ class TestCanonicalJsonTypeSafetyNegatives(unittest.TestCase):
 
     def test_integer_range_boundaries(self):
         """Integers strictly in [-9007199254740991, 9007199254740991]."""
-        # Exact boundaries pass
         self.assertIsNotNone(canonicalize_json_v1({"min": MIN_SAFE_INTEGER}))
         self.assertIsNotNone(canonicalize_json_v1({"max": MAX_SAFE_INTEGER}))
         self.assertIsNotNone(canonicalize_json_v1({"zero": 0}))
@@ -228,7 +322,7 @@ class TestCanonicalJsonTypeSafetyNegatives(unittest.TestCase):
             canonicalize_json_v1({1, 2, 3})
 
     def test_timestamp_validation(self):
-        """Enforces YYYY-MM-DDTHH:MM:SSZ calendar contract."""
+        """R1-04: Enforces YYYY-MM-DDTHH:MM:SSZ calendar contract as explicit primitive."""
         # Valid
         validate_canonical_timestamp("2026-09-20T21:00:00Z")
         validate_canonical_timestamp("2024-02-29T12:00:00Z")  # Leap year
@@ -252,6 +346,10 @@ class TestCanonicalJsonTypeSafetyNegatives(unittest.TestCase):
         # Non-string rejected
         with self.assertRaises(TypeError):
             validate_canonical_timestamp(123456789)
+
+        # Confirm non-timestamp arbitrary strings pass canonical JSON without heuristic rejection
+        arbitrary_data = {"description": "ordinary string", "version": "1.0.0"}
+        self.assertIsNotNone(canonicalize_json_v1(arbitrary_data))
 
 
 class TestCatalogParser(unittest.TestCase):
@@ -438,6 +536,71 @@ class TestCatalogReadOnlyPolicy(unittest.TestCase):
     def setUp(self):
         self.policy = CatalogReadOnlyPolicy()
 
+    def test_sdkmanager_invocation_allowlist_positives(self):
+        """R1-01 / Section 3: Exact read-only sdkmanager invocations succeed."""
+        positive_cases = [
+            ["--sdk_root=/usr/local/lib/android/sdk", "--list", "--verbose", "--channel=0"],
+            ["--list", "--verbose", "--channel=0", "--sdk_root=/usr/local/lib/android/sdk"],
+            ["--sdk_root", "/opt/android-sdk", "--list", "--verbose", "--channel=0"],
+            ["--channel=0", "--list", "--verbose", "--sdk_root=/sdk"],
+            ["--sdk_root=/sdk", "--list", "--verbose", "--channel", "0"],
+        ]
+        for args in positive_cases:
+            valid, err = self.policy.verify_sdkmanager_invocation(args)
+            self.assertTrue(valid, f"Expected pass for {args}, got err: {err}")
+            self.assertIsNone(err)
+
+    def test_sdkmanager_invocation_allowlist_negatives(self):
+        """R1-01 / Section 3: Positional arguments, mutating flags, and missing flags fail."""
+        negative_cases = [
+            # Positional package arguments
+            (["emulator"], "POSITIONAL_ARGUMENT_PROHIBITED"),
+            (["--sdk_root=/sdk", "emulator"], "POSITIONAL_ARGUMENT_PROHIBITED"),
+            (["--sdk_root=/sdk", "system-images;android-36;default;x86_64"], "POSITIONAL_ARGUMENT_PROHIBITED"),
+            (["--list", "emulator"], "POSITIONAL_ARGUMENT_PROHIBITED"),
+            (["--sdk_root=/sdk", "--list", "--verbose", "--channel=0", "emulator"], "POSITIONAL_ARGUMENT_PROHIBITED"),
+            (["--sdk_root=/sdk", "--list", "--verbose", "--channel=0", "pkg1", "pkg2"], "POSITIONAL_ARGUMENT_PROHIBITED"),
+            # Missing required flags
+            (["--sdk_root=/sdk", "--list", "--verbose"], "MISSING_MANDATORY_FLAG: --channel=0"),
+            (["--sdk_root=/sdk", "--list", "--channel=0"], "MISSING_MANDATORY_FLAG: --verbose"),
+            (["--sdk_root=/sdk", "--verbose", "--channel=0"], "MISSING_MANDATORY_FLAG: --list"),
+            (["--list", "--verbose", "--channel=0"], "MISSING_MANDATORY_FLAG: --sdk_root"),
+            # Channel != 0
+            (["--sdk_root=/sdk", "--list", "--verbose", "--channel=1"], "DISALLOWED_CHANNEL_VALUE"),
+            (["--sdk_root=/sdk", "--list", "--verbose", "--channel", "2"], "DISALLOWED_CHANNEL_VALUE"),
+            # Duplicate / ambiguous flags
+            (["--sdk_root=/sdk1", "--sdk_root=/sdk2", "--list", "--verbose", "--channel=0"], "AMBIGUOUS_REPEATED_FLAG"),
+            (["--sdk_root=/sdk", "--list", "--list", "--verbose", "--channel=0"], "AMBIGUOUS_REPEATED_FLAG"),
+            # Mutating flags
+            (["--install", "emulator"], "DISALLOWED_OR_UNKNOWN_FLAG"),
+            (["--update"], "DISALLOWED_OR_UNKNOWN_FLAG"),
+            (["--uninstall", "emulator"], "DISALLOWED_OR_UNKNOWN_FLAG"),
+            (["--licenses"], "DISALLOWED_OR_UNKNOWN_FLAG"),
+            # Unknown flags
+            (["--sdk_root=/sdk", "--list", "--verbose", "--channel=0", "--unknown"], "DISALLOWED_OR_UNKNOWN_FLAG"),
+        ]
+        for args, expected_keyword in negative_cases:
+            valid, err = self.policy.verify_sdkmanager_invocation(args)
+            self.assertFalse(valid, f"Expected failure for {args}")
+            self.assertIn(expected_keyword, err)
+
+    def test_sdkmanager_in_scripts_rejected_if_positional_or_mutating(self):
+        """sdkmanager positional or mutating calls inside shell scripts are rejected."""
+        failing_scripts = [
+            'sdkmanager "emulator"',
+            'sdkmanager --sdk_root=/sdk "emulator"',
+            'sdkmanager --sdk_root=/sdk \\\n  "system-images;android-36;default;x86_64"',
+            'sdkmanager --list "emulator"',
+            'sdkmanager --sdk_root=/sdk --list --verbose --channel=0 "emulator"',
+            'sdkmanager --install emulator',
+            'sdkmanager --update',
+            'sdkmanager --licenses',
+        ]
+        for s in failing_scripts:
+            valid, violations = self.policy.verify_script(s)
+            self.assertFalse(valid, f"Expected script rejection for: {s}")
+            self.assertTrue(len(violations) > 0)
+
     def test_rejection_of_sudo(self):
         """sudo in any variant must be rejected."""
         variants = [
@@ -550,7 +713,7 @@ class TestCatalogReadOnlyPolicy(unittest.TestCase):
         for v in variants:
             is_valid, violations = self.policy.verify_script(v)
             self.assertFalse(is_valid, f"Failed to reject: {v}")
-            self.assertIn("SDK_MUTATION_PROHIBITED", violations)
+            self.assertTrue(len(violations) > 0)
 
     def test_rejection_of_emulator_avd_launches(self):
         """emulator -avd or @ launches must be rejected in script."""
@@ -603,7 +766,7 @@ class TestCatalogReadOnlyPolicy(unittest.TestCase):
     def test_allowed_read_only_scripts(self):
         """Pure read-only discovery commands pass the policy."""
         allowed_scripts = [
-            "sdkmanager --list --verbose --channel=0",
+            "sdkmanager --sdk_root=/usr/local/lib/android/sdk --list --verbose --channel=0",
             "emulator -help",
             'echo "Validating environment"',
         ]

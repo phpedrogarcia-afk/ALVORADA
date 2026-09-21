@@ -16,6 +16,8 @@ from catalog_core import (
     MAX_SAFE_INTEGER,
     validate_canonical_timestamp,
     validate_canonical_data,
+    escape_canonical_string,
+    serialize_canonical_json_v1,
     canonicalize_json_v1,
     hash_canonical_json_v1,
     json_loads_canonical,

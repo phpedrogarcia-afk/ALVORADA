@@ -1,14 +1,14 @@
 # HOST RUNTIME PREREQUISITES & CAUSAL EVIDENCE
 
-**Status:** RECOVERY-G1-001 CANONICAL ARCHITECTURE SPECIFICATION  
-**Contract Version:** `ALVORADA_HOST_PREREQUISITES_V1`  
+**Status:** RECOVERY-G1-001 RECOVERY CANDIDATE SPECIFICATION<br>
+**Contract Version:** `ALVORADA_HOST_PREREQUISITES_V1`<br>
 **Classification:** `OBSERVED_HOST_RUNTIME_PREREQUISITE`
 
 ---
 
 ## 1. Context and Observed Causal Fact
 
-During G1 baseline probing on Linux runners (Ubuntu 24.04 LTS on GitHub Actions `ubuntu-latest`), execution of the Android Emulator binary (`emulator -version`) failed with exit code 127:
+During G1 baseline probing on Linux runners (Ubuntu 24.04 LTS on GitHub Actions runner `ubuntu-24.04`), execution of the Android Emulator binary (`emulator -version`) failed with exit code 127:
 
 ```
 emulator: error while loading shared libraries: libpulse.so.0: cannot open shared object file: No such file or directory
@@ -24,7 +24,7 @@ the experimental probe demonstrated immediate resolution:
 1. `emulator -version` executed successfully, returning `Android emulator version 37.1.11.0 (build_id 13028291)`.
 2. `emulator -accel-check` executed successfully, returning `accel: 0` (confirming KVM hardware acceleration availability).
 
-No other host libraries were required for emulator CLI initialization.
+Within the observed runner image and Emulator revision, libpulse0 was the missing runtime dependency that blocked CLI initialization; this does not establish completeness for other images or revisions.
 
 ---
 
