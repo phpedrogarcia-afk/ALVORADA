@@ -313,6 +313,72 @@ class TestWave1PreflightVerifier(unittest.TestCase):
             if os.path.exists(tmp_path):
                 os.remove(tmp_path)
 
+    def test_approved_proposal_preserves_discovery_hash_and_executes(self):
+        with open(self.canonical_proposal_path, "r", encoding="utf-8") as f:
+            data = json.load(f)
+
+        data["lock_approved"] = "YES"
+        with tempfile.NamedTemporaryFile("w", delete=False, suffix=".json") as tmp:
+            json.dump(data, tmp)
+            tmp_path = tmp.name
+
+        try:
+            verifier = Wave1PreflightVerifier(tmp_path)
+            is_valid, plan, errors = verifier.verify_and_plan(enforce_approval=True)
+            self.assertTrue(is_valid, f"Expected valid plan, got errors: {errors}")
+            self.assertEqual(len(errors), 0)
+            self.assertTrue(plan["lock_approved"])
+            self.assertTrue(plan["ready_for_execution"])
+            self.assertEqual(plan["proposal_sha256"], "55087ef875573c7204251cd22ddd5fa92dd35b98321d95bcf41e60bddcc50d9f")
+        finally:
+            if os.path.exists(tmp_path):
+                os.remove(tmp_path)
+
+    def test_tampered_package_revision_fails_even_if_approved(self):
+        with open(self.canonical_proposal_path, "r", encoding="utf-8") as f:
+            data = json.load(f)
+
+        data["lock_approved"] = "YES"
+        data["packages"]["emulator"]["catalog_revision"] = "99.9.9"
+        with tempfile.NamedTemporaryFile("w", delete=False, suffix=".json") as tmp:
+            json.dump(data, tmp)
+            tmp_path = tmp.name
+
+        try:
+            verifier = Wave1PreflightVerifier(tmp_path)
+            is_valid, plan, errors = verifier.verify_and_plan(enforce_approval=True)
+            self.assertFalse(is_valid)
+            self.assertTrue(any("HASH_MISMATCH" in err for err in errors))
+        finally:
+            if os.path.exists(tmp_path):
+                os.remove(tmp_path)
+
+    def test_cli_approve_lock(self):
+        with open(self.canonical_proposal_path, "r", encoding="utf-8") as f:
+            data = json.load(f)
+
+        with tempfile.NamedTemporaryFile("w", delete=False, suffix=".json") as tmp:
+            json.dump(data, tmp)
+            tmp_path = tmp.name
+
+        try:
+            script_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "catalog_discovery.py")
+            res = subprocess.run([sys.executable, script_path, "approve-lock", "--proposal", tmp_path], capture_output=True, text=True)
+            self.assertEqual(res.returncode, 0)
+            self.assertIn("LOCK_APPROVED=YES", res.stdout)
+            self.assertIn("STATUS=READY_FOR_WAVE1_EXECUTION", res.stdout)
+
+            # Now verify that wave1-preflight --enforce-approval succeeds
+            verifier = Wave1PreflightVerifier(tmp_path)
+            is_valid, plan, errors = verifier.verify_and_plan(enforce_approval=True)
+            self.assertTrue(is_valid)
+            self.assertTrue(plan["ready_for_execution"])
+            self.assertTrue(plan["lock_approved"])
+            self.assertEqual(plan["proposal_sha256"], "55087ef875573c7204251cd22ddd5fa92dd35b98321d95bcf41e60bddcc50d9f")
+        finally:
+            if os.path.exists(tmp_path):
+                os.remove(tmp_path)
+
 
 if __name__ == "__main__":
     unittest.main()

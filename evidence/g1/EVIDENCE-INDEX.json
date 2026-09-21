@@ -693,6 +693,72 @@
         "READY_FOR_E1_WAVE1"
       ],
       "claim_envelope": "Catalog discovery is proven strictly read-only on ubuntu-24.04 runner. 3 of 5 HARD_LOCK packages are preinstalled; 2 packages are absent. Proposal SHA-256 is 55087ef875573c7204251cd22ddd5fa92dd35b98321d95bcf41e60bddcc50d9f. LOCK_APPROVED remains NO awaiting human review. READY_FOR_E1_WAVE1 remains NO."
+    },
+    {
+      "evidence_id": "EVID-G1-0018",
+      "evidence_level": "GITHUB_ACTIONS_LAB_WAVE1_AUDIT_PROBE",
+      "device_or_emulator": "No Android guest; GitHub-hosted Ubuntu runner only",
+      "api": null,
+      "build_fingerprint": null,
+      "scenario": "E1_LAB_WAVE1_PROVISIONING_AUDIT_PROBE",
+      "scheduling_strategy": "NOT_REACHED",
+      "preconditions": "Wave 1 provisioning workflow executed in audit mode on autonomous branch fio/autonomy-g1 at e98d0720a29c3aa513c81a7fb1beb6e584cce291; fail-closed lock enforcement; zero package installation, license acceptance, or AVD creation",
+      "permission_state": "contents:read",
+      "scheduled_time": null,
+      "captured_at_utc": "2026-09-20T23:32:21Z",
+      "repository": {
+        "visibility": "public",
+        "workflow_name": "E1 lab Wave 1 provisioning probe",
+        "workflow_run_id": 35544892104,
+        "job_id": 106168931230,
+        "commit": "e98d0720a29c3aa513c81a7fb1beb6e584cce291",
+        "run_conclusion": "success",
+        "workflow_permissions": "contents:read"
+      },
+      "event_timeline": [
+        "Ephemeral KVM ACL applied with setfacl; /dev/kvm accessible rw to runner user",
+        "Dependency preflight verified libpulse0 presence",
+        "Execute provision-wave1.sh in default audit mode; exit code 0",
+        "Verify Wave1PreflightVerifier cryptographic hash against canonical proposal 55087ef875573c7204251cd22ddd5fa92dd35b98321d95bcf41e60bddcc50d9f",
+        "Confirm WAVE1_VALID=YES and WAVE1_LOCK_APPROVED=NO",
+        "Confirm WAVE1_INSTALL_PACKAGES=emulator system-images;android-36;default;x86_64",
+        "Confirm WAVE1_STATUS=PREFLIGHT_PLAN_VERIFIED and zero packages installed",
+        "Persist 800-byte artifact 10616571264 containing execution log"
+      ],
+      "metrics": {
+        "runner_environment": "github-hosted",
+        "runner_image": "ubuntu-24.04",
+        "scenario_executions": 0,
+        "p1_p10_pass_count": 0,
+        "p1_p10_unknown_count": 10,
+        "preflight_exit_code": 0,
+        "wave1_exit_code": 0,
+        "proposal_payload_sha256": "55087ef875573c7204251cd22ddd5fa92dd35b98321d95bcf41e60bddcc50d9f",
+        "artifact_size_bytes": 800
+      },
+      "environment": {
+        "host_os": "Ubuntu 24.04.5 LTS",
+        "android_sdk_root": "/usr/local/lib/android/sdk",
+        "android_home": "/usr/local/lib/android/sdk",
+        "kvm_permissions": "rw_via_setfacl",
+        "libpulse0": "INSTALLED",
+        "tooling": {
+          "sdkmanager_location": "/usr/local/lib/android/sdk/cmdline-tools/latest/bin/sdkmanager",
+          "preflight_verifier": "experiments/reliability-harness/scripts/catalog_discovery.py"
+        }
+      },
+      "result": "PREFLIGHT_PLAN_VERIFIED",
+      "severity": null,
+      "raw_log_reference": "GitHub Actions artifact 10616571264",
+      "artifact_id": 10616571264,
+      "artifact_sha256": "8c5cbf0e0955f0a54dff2a2e5e0f33ffe8aabf3a6cae9caabf675e23b8cf4ea5",
+      "artifact_retention_days": 1,
+      "related_contract_clause": [
+        "05R-F-WAVE1-SPEC",
+        "ALVORADA_WAVE1_PROVISIONING_PLAN_V1",
+        "READY_FOR_E1_WAVE1"
+      ],
+      "claim_envelope": "Wave 1 provisioning workflow executed in audit mode on standard ubuntu-24.04 runner. KVM ACL and libpulse0 dependency verified. Proposal cryptographic integrity verified against canonical proposal hash 55087ef... Zero packages installed, zero licenses accepted, zero mutations. LOCK_APPROVED remains NO awaiting human review. READY_FOR_E1_WAVE1 remains NO."
     }
   ]
 }

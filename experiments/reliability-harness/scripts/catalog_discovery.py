@@ -241,10 +241,14 @@ class Wave1PreflightVerifier:
         if proposal.get("contract") != "ALVORADA_CATALOG_LOCK_PROPOSAL_V1":
             errors.append(f"INVALID_CONTRACT: {proposal.get('contract')}")
 
-        # Verify internal cryptographic payload hash
+        # Verify internal cryptographic payload hash against canonical discovery state.
+        # Discovery hash was sealed with lock_approved="NO"; this binds the packages,
+        # revisions, and metadata immutably to the CI discovery run (35540374123)
+        # while permitting human approval to toggle lock_approved to "YES".
         recorded_sha256 = proposal.get("proposal_sha256")
-        payload_without_sha = {k: v for k, v in proposal.items() if k != "proposal_sha256"}
-        computed_sha256 = hash_canonical_json_v1(payload_without_sha)
+        discovery_payload = {k: v for k, v in proposal.items() if k != "proposal_sha256"}
+        discovery_payload["lock_approved"] = "NO"
+        computed_sha256 = hash_canonical_json_v1(discovery_payload)
 
         if recorded_sha256 != computed_sha256:
             errors.append(f"HASH_MISMATCH: recorded={recorded_sha256} computed={computed_sha256}")
@@ -320,6 +324,10 @@ def main() -> None:
     wave1_p = subparsers.add_parser("wave1-preflight", help="Validate catalog lock proposal and generate Wave 1 plan")
     wave1_p.add_argument("--proposal", "-p", required=True, help="Path to canonical_catalog_proposal.json")
     wave1_p.add_argument("--enforce-approval", action="store_true", help="Fail closed if lock_approved is not YES")
+
+    # Subcommand: approve-lock
+    approve_p = subparsers.add_parser("approve-lock", help="Founder tool: approve canonical catalog lock proposal")
+    approve_p.add_argument("--proposal", "-p", required=True, help="Path to canonical_catalog_proposal.json")
 
     args = parser.parse_args()
 
@@ -401,6 +409,33 @@ def main() -> None:
             for err in errors:
                 print(f"ERROR={err}")
             sys.exit(2)
+
+    elif args.subcommand == "approve-lock":
+        try:
+            with open(args.proposal, "r", encoding="utf-8") as f:
+                proposal = json.load(f)
+        except Exception as e:
+            print(f"ERROR=FAILED_TO_READ_PROPOSAL: {e}")
+            sys.exit(2)
+
+        verifier = Wave1PreflightVerifier(args.proposal)
+        is_valid, plan, errors = verifier.verify_and_plan(enforce_approval=False)
+        if not is_valid:
+            print("ERROR=CANNOT_APPROVE_INVALID_PROPOSAL")
+            for err in errors:
+                print(f"ERROR={err}")
+            sys.exit(2)
+
+        proposal["lock_approved"] = "YES"
+        canon_bytes = canonicalize_json_v1(proposal)
+        with open(args.proposal, "wb") as f:
+            f.write(canon_bytes)
+            f.write(b"\n")
+
+        print("LOCK_APPROVED=YES")
+        print(f"PROPOSAL_SHA256={proposal['proposal_sha256']}")
+        print("STATUS=READY_FOR_WAVE1_EXECUTION")
+        sys.exit(0)
 
 
 if __name__ == "__main__":
