@@ -327,40 +327,41 @@ def ephemeral_provision_emulator(
 # 4. STRICT & FLEXIBLE GPU HELP PARSER
 # -----------------------------------------------------------------------------
 
+def strip_log_prefix(line: str) -> str:
+    """Strips logger / emulator prefixes like 'INFO |', 'WARNING |', 'emulator: '."""
+    return re.sub(
+        r"^(?:(?:INFO|WARNING|ERROR|DEBUG)\s*\|\s*|emulator:\s*(?:WARNING|ERROR|INFO)?:\s*)",
+        "",
+        line.strip(),
+        flags=re.IGNORECASE,
+    )
+
+
 def is_strict_header(line: str) -> bool:
     """
-    Strictly detects standard and known output headers for GPU mode listings:
+    Detects standard and known output headers for GPU mode listings:
     - Must end with ':'
-    - Must contain whole word 'gpu' and 'mode' or 'modes'
-    - Matches standard phrases such as:
-      'Valid gpu modes are:'
-      'Supported gpu modes:'
-      'available gpu modes:'
-      'GPU modes:'
-      'One of the following gpu modes:'
+    - Must contain whole word 'gpu' or flag '-gpu'
+    - Matches topics like modes or values, or explicit sequence phrases
     """
-    normalized = line.strip().lower()
-    if not normalized.endswith(":"):
+    clean = strip_log_prefix(line).strip()
+    if not clean.endswith(":"):
         return False
 
-    has_gpu = bool(re.search(r"\bgpu\b", normalized))
-    has_mode = bool(re.search(r"\bmodes?\b", normalized))
-    if not (has_gpu and has_mode):
+    norm = clean[:-1].strip().lower()
+    if "usage" in norm:
         return False
 
-    explicit_sequence = any(
-        phrase in normalized
+    has_gpu = bool(re.search(r"(?:^|[^a-z0-9_-])-?gpu(?:$|[^a-z0-9_-])", norm))
+    if not has_gpu:
+        return False
+
+    has_topic = bool(re.search(r"\b(modes?|values?)\b", norm))
+    explicit_seq = any(
+        phrase in norm
         for phrase in ("one of", "the following", "listed below")
     )
-    if explicit_sequence:
-        return True
-
-    header_pattern = re.compile(
-        r"^(?:(?:available|supported|valid)\s+)?gpu\s+modes?(?:\s+(?:available|supported|valid))?(?:\s+are)?\s*:|"
-        r"^(?:available|supported|valid)\s+gpu\s+modes?(?:\s+are)?\s*:|"
-        r"^gpu\s+modes?\s*:"
-    )
-    return bool(header_pattern.fullmatch(normalized))
+    return has_topic or explicit_seq
 
 
 def parse_gpu_help_output(raw_text: str) -> Tuple[str, List[str]]:
@@ -374,42 +375,94 @@ def parse_gpu_help_output(raw_text: str) -> Tuple[str, List[str]]:
         return "UNAVAILABLE", []
 
     lines = raw_text.splitlines()
+
+    KNOWN_GPU_MODES = {
+        "auto",
+        "host",
+        "swiftshader_indirect",
+        "angle_indirect",
+        "guest",
+        "mesa",
+        "off",
+        "angle",
+        "swiftshader",
+        "auto-no-window",
+        "software",
+    }
+
+    excluded_keywords = {
+        "and", "available", "default", "example", "following", "gpu", "mode",
+        "modes", "note", "or", "supported", "the", "this", "use", "valid", "warning",
+        "info", "error", "see", "emulator", "options", "option", "values", "value"
+    }
+
+    # Check for strict block header
     header_indices = [idx for idx, line in enumerate(lines) if is_strict_header(line)]
+
+    candidates: List[str] = []
+
+    # If no strict block header ending with colon, check for inline list line
+    if len(header_indices) == 0:
+        inline_matches: List[Tuple[int, List[str]]] = []
+        for idx, line in enumerate(lines):
+            clean = strip_log_prefix(line).strip()
+            if ":" in clean:
+                prefix, suffix = clean.split(":", 1)
+                if is_strict_header(prefix + ":") and suffix.strip():
+                    tokens = [
+                        re.sub(r"^['\"`]|['\"`]$", "", tok.strip().strip(",;."))
+                        for tok in suffix.strip().split()
+                    ]
+                    matched = [
+                        t.lower() for t in tokens
+                        if re.match(r"^[a-z][a-z0-9_-]{0,63}$", t, re.IGNORECASE)
+                        and t.lower() not in excluded_keywords
+                    ]
+                    if matched and any(m in KNOWN_GPU_MODES for m in matched):
+                        inline_matches.append((idx, matched))
+        if len(inline_matches) == 1:
+            candidates = inline_matches[0][1]
+            normalized = sorted(list(set(candidates)))
+            return "PASS_STRICT", normalized
+        return "AMBIGUOUS", []
 
     if len(header_indices) != 1:
         return "AMBIGUOUS", []
 
     header_idx = header_indices[0]
-    candidate_pattern = re.compile(
-        r"^(\s+)(?:[-*]\s+)?([a-z][a-z0-9_-]{0,63})(?:(\s*)$|(?:\s{2,}|\s+-\s+|\s*:\s+)(\S.*))"
-    )
-    excluded_keywords = {
-        "and", "available", "default", "example", "following", "gpu", "mode",
-        "modes", "note", "supported", "the", "this", "use", "valid"
-    }
-
-    candidates: List[str] = []
     expected_indent: Optional[int] = None
     started = False
+
+    candidate_pattern = re.compile(
+        r"^(\s+)(?:[-*+]\s+)?['\"`]?([a-z][a-z0-9_-]{0,63})['\"`]?(?:(?:\s*)$|(?:\s*:\s*|\s+-\s+|\s{2,})(.*))$",
+        re.IGNORECASE,
+    )
 
     for line in lines[header_idx + 1:]:
         stripped = line.strip()
         if not stripped:
             if started:
-                # Blank line marks end of candidate block
                 break
             continue
 
-        match = candidate_pattern.fullmatch(line)
-        if match is not None:
-            indent, token, bare_suffix, description = match.groups()
+        clean_stripped = strip_log_prefix(line).strip()
+        # Skip diagnostic/log lines that might appear before or during output
+        if strip_log_prefix(line) != line.strip() or clean_stripped.lower().startswith(
+            ("warning:", "info:", "error:", "debug:", "emulator:")
+        ):
+            continue
+
+        m = candidate_pattern.match(line)
+        if m is not None:
+            indent, token, description = m.groups()
+            token = token.lower()
+
             if token in excluded_keywords:
                 return "AMBIGUOUS", []
 
             if expected_indent is None:
                 expected_indent = len(indent)
             elif len(indent) != expected_indent:
-                # Inconsistent candidate indentation
                 return "AMBIGUOUS", []
 
             candidates.append(token)
@@ -421,10 +474,10 @@ def parse_gpu_help_output(raw_text: str) -> Tuple[str, List[str]]:
                 # Continuation line of previous candidate's multi-line description
                 continue
             elif started:
-                # Encountered non-matching line after candidates started (e.g. trailing section/note)
+                # Non-matching line after candidate block means section ended
                 break
             else:
-                # Non-empty non-matching line before any candidate started
+                # Non-matching line before any candidate started
                 return "AMBIGUOUS", []
 
     normalized_candidates = sorted(list(set(candidates)))
@@ -693,6 +746,13 @@ def run_gpu_evidence_probe(
         else:
             parser_status, candidates = parse_gpu_help_output(help_gpu_output)
             overall_status = "PASS_STRICT" if parser_status == "PASS_STRICT" else "AMBIGUOUS"
+
+        print("========================================", file=sys.stderr)
+        print(f"RAW_HELP_GPU_OUTPUT ({len(help_gpu_output)} bytes):", file=sys.stderr)
+        print(help_gpu_output, file=sys.stderr)
+        print(f"PARSER_STATUS: {parser_status}", file=sys.stderr)
+        print(f"CANDIDATES: {candidates}", file=sys.stderr)
+        print("========================================", file=sys.stderr)
 
         gpu_evidence = build_gpu_evidence(
             candidate_modes=candidates,

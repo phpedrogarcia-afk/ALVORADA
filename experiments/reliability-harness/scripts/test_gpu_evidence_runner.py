@@ -132,6 +132,41 @@ The following gpu modes are supported:
         self.assertEqual(status, "PASS_STRICT")
         self.assertEqual(candidates, ["auto", "host", "off"])
 
+    def test_quoted_tokens_and_diagnostic_warnings(self):
+        raw = """\
+INFO    | Android Emulator version 37.1.11
+WARNING | No display found
+Valid values for -gpu are:
+WARNING | Failed to probe hardware acceleration
+  'auto': host detection
+  'host': desktop GL
+  'swiftshader_indirect': CPU renderer
+  'off': disabled
+"""
+        status, candidates = parse_gpu_help_output(raw)
+        self.assertEqual(status, "PASS_STRICT")
+        self.assertEqual(candidates, ["auto", "host", "off", "swiftshader_indirect"])
+
+    def test_inline_comma_separated_modes(self):
+        raw = """\
+Valid gpu modes are: auto, host, swiftshader_indirect, off
+"""
+        status, candidates = parse_gpu_help_output(raw)
+        self.assertEqual(status, "PASS_STRICT")
+        self.assertEqual(candidates, ["auto", "host", "off", "swiftshader_indirect"])
+
+    def test_unrecognized_header_fails_ambiguous(self):
+        raw = """\
+Options for GPU rendering:
+  auto - automatic
+  host - desktop
+  swiftshader_indirect - software
+  off - none
+"""
+        status, candidates = parse_gpu_help_output(raw)
+        self.assertEqual(status, "AMBIGUOUS")
+        self.assertEqual(candidates, [])
+
     def test_empty_output_fails_unavailable(self):
         status, candidates = parse_gpu_help_output("")
         self.assertEqual(status, "UNAVAILABLE")
