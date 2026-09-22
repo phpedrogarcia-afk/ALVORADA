@@ -12,6 +12,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 from test_catalog_core import *
 from test_catalog_lock_model import *
+from test_catalog_discovery_runner import *
 
 if __name__ == "__main__":
     unittest.main()
