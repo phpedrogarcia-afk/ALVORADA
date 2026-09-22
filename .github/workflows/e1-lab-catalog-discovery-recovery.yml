@@ -5,8 +5,16 @@ on:
     inputs:
       expected_head_sha:
         description: 'Expected commit SHA on fio/g1-autonomy-recovery'
-        required: true
+        required: false
         type: string
+  push:
+    branches:
+      - fio/g1-autonomy-recovery
+    paths:
+      - '.github/workflows/e1-lab-catalog-discovery-recovery.yml'
+      - 'experiments/reliability-harness/scripts/catalog_discovery_runner.py'
+      - 'experiments/reliability-harness/scripts/catalog_core.py'
+      - 'experiments/reliability-harness/scripts/catalog_lock_model.py'
 
 permissions:
   contents: read
@@ -35,15 +43,19 @@ jobs:
       - name: Checkout exact commit
         uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
         with:
-          ref: ${{ inputs.expected_head_sha }}
+          ref: ${{ github.sha }}
 
-      - name: Verify checked-out commit matches expected HEAD
+      - name: Verify checked-out commit matches HEAD
         shell: bash
         run: |
           checked_out="$(git rev-parse HEAD)"
           expected="${{ inputs.expected_head_sha }}"
-          if [ "$checked_out" != "$expected" ]; then
+          if [ -n "$expected" ] && [ "$checked_out" != "$expected" ]; then
             echo "ERROR: Checked-out commit ($checked_out) does not match expected_head_sha ($expected)" >&2
+            exit 1
+          fi
+          if [ "$checked_out" != "${{ github.sha }}" ]; then
+            echo "ERROR: Checked-out commit ($checked_out) does not match github.sha (${{ github.sha }})" >&2
             exit 1
           fi
           echo "HEAD_VERIFIED=$checked_out"
