@@ -11,9 +11,34 @@
     "accounting_integrity_note": "Previous campaign accounting recorded without revisionism; 6 runs were consumed."
   },
   "e1_proof_campaign_001": {
-    "status": "IN_PROGRESS",
+    "status": "COMPLETED_PASS",
     "ci_budget": 6,
-    "ci_runs_dispatched": 0,
-    "max_external_ci_runs": 6
+    "ci_runs_dispatched": 3,
+    "ci_budget_remaining": 3,
+    "max_external_ci_runs": 6,
+    "runs": [
+      {
+        "run_number": 1,
+        "run_id": "35757219782",
+        "commit_sha": "ffedf59bcce0d5f9c66f46a2ecbbd9bdcb83a79f",
+        "outcome": "FAILED_A5_TIMEOUT",
+        "diagnosis": "AlarmManager ~2s delivery jitter exceeded tight 5.0s poll timeout."
+      },
+      {
+        "run_number": 2,
+        "run_id": "35758124017",
+        "commit_sha": "9296aeb6c13bfaa18305dcbcddc02ffca1c5f5e6",
+        "outcome": "FAILED_A5_SNOOZE_DUPLICATE_GUARD",
+        "diagnosis": "WakeAlarmReceiver rejected legitimate snooze child occurrence because store.state was STATE_SNOOZED."
+      },
+      {
+        "run_number": 3,
+        "run_id": "35758945392",
+        "commit_sha": "8577f1e24a2d387bea5440609deda785ae007f2b",
+        "outcome": "ALL_PASS",
+        "diagnosis": "All scenarios A1-A6, B1-B3, Phase 11, Phase 12 verified PASS on locked reference runner."
+      }
+    ],
+    "verification_result": "G1_E1_CORE_RELIABILITY_WAVE_A = PASS"
   }
 }

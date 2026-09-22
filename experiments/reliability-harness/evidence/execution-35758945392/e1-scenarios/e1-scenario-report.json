@@ -1,0 +1,277 @@
+{
+  "campaign": "ALVORADA_G1_E1_RELIABILITY_001",
+  "completion_time_utc": "2026-09-22T17:18:25Z",
+  "contract": "ALVORADA_E1_SCENARIO_EVIDENCE_V1",
+  "lock_digest": "ac243a03caca0333eec85721cbd27f828a001c3b19ed80d7994e33589f065f05",
+  "overall_status": "PASS",
+  "repository_commit_sha": "8577f1e24a2d387bea5440609deda785ae007f2b",
+  "run_id": "35758945392",
+  "scenarios": {
+    "A1_BASELINE": {
+      "details": [
+        {
+          "delivery_delta_ms": 2623,
+          "duplicate_count": 0,
+          "occurrence_id": "occ_a1_rep_1_1790097169141",
+          "repetition": 1,
+          "result": "PASS",
+          "trigger_to_software_audio_ms": 19
+        },
+        {
+          "delivery_delta_ms": 2002,
+          "duplicate_count": 0,
+          "occurrence_id": "occ_a1_rep_2_1790097175406",
+          "repetition": 2,
+          "result": "PASS",
+          "trigger_to_software_audio_ms": 8
+        },
+        {
+          "delivery_delta_ms": 2002,
+          "duplicate_count": 0,
+          "occurrence_id": "occ_a1_rep_3_1790097180763",
+          "repetition": 3,
+          "result": "PASS",
+          "trigger_to_software_audio_ms": 8
+        },
+        {
+          "delivery_delta_ms": 2001,
+          "duplicate_count": 0,
+          "occurrence_id": "occ_a1_rep_4_1790097186110",
+          "repetition": 4,
+          "result": "PASS",
+          "trigger_to_software_audio_ms": 13
+        },
+        {
+          "delivery_delta_ms": 2001,
+          "duplicate_count": 0,
+          "occurrence_id": "occ_a1_rep_5_1790097191430",
+          "repetition": 5,
+          "result": "PASS",
+          "trigger_to_software_audio_ms": 9
+        },
+        {
+          "delivery_delta_ms": 2001,
+          "duplicate_count": 0,
+          "occurrence_id": "occ_a1_rep_6_1790097196761",
+          "repetition": 6,
+          "result": "PASS",
+          "trigger_to_software_audio_ms": 7
+        },
+        {
+          "delivery_delta_ms": 2002,
+          "duplicate_count": 0,
+          "occurrence_id": "occ_a1_rep_7_1790097202089",
+          "repetition": 7,
+          "result": "PASS",
+          "trigger_to_software_audio_ms": 17
+        },
+        {
+          "delivery_delta_ms": 2001,
+          "duplicate_count": 0,
+          "occurrence_id": "occ_a1_rep_8_1790097207404",
+          "repetition": 8,
+          "result": "PASS",
+          "trigger_to_software_audio_ms": 8
+        },
+        {
+          "delivery_delta_ms": 2001,
+          "duplicate_count": 0,
+          "occurrence_id": "occ_a1_rep_9_1790097212701",
+          "repetition": 9,
+          "result": "PASS",
+          "trigger_to_software_audio_ms": 6
+        },
+        {
+          "delivery_delta_ms": 2001,
+          "duplicate_count": 0,
+          "occurrence_id": "occ_a1_rep_10_1790097218006",
+          "repetition": 10,
+          "result": "PASS",
+          "trigger_to_software_audio_ms": 10
+        }
+      ],
+      "repetitions": 10,
+      "result": "PASS",
+      "scenario": "A1_BASELINE"
+    },
+    "A2_PROCESS_DEATH": {
+      "details": [
+        {
+          "delivery_delta_ms": 1001,
+          "duplicate_count": 0,
+          "occurrence_id": "occ_a2_rep_1_1790097223331",
+          "repetition": 1,
+          "result": "PASS",
+          "trigger_to_software_audio_ms": 12
+        },
+        {
+          "delivery_delta_ms": 1002,
+          "duplicate_count": 0,
+          "occurrence_id": "occ_a2_rep_2_1790097228689",
+          "repetition": 2,
+          "result": "PASS",
+          "trigger_to_software_audio_ms": 11
+        },
+        {
+          "delivery_delta_ms": 1003,
+          "duplicate_count": 0,
+          "occurrence_id": "occ_a2_rep_3_1790097234050",
+          "repetition": 3,
+          "result": "PASS",
+          "trigger_to_software_audio_ms": 13
+        },
+        {
+          "delivery_delta_ms": 1001,
+          "duplicate_count": 0,
+          "occurrence_id": "occ_a2_rep_4_1790097239404",
+          "repetition": 4,
+          "result": "PASS",
+          "trigger_to_software_audio_ms": 10
+        },
+        {
+          "delivery_delta_ms": 1002,
+          "duplicate_count": 0,
+          "occurrence_id": "occ_a2_rep_5_1790097244758",
+          "repetition": 5,
+          "result": "PASS",
+          "trigger_to_software_audio_ms": 11
+        },
+        {
+          "delivery_delta_ms": 1002,
+          "duplicate_count": 0,
+          "occurrence_id": "occ_a2_rep_6_1790097250111",
+          "repetition": 6,
+          "result": "PASS",
+          "trigger_to_software_audio_ms": 11
+        },
+        {
+          "delivery_delta_ms": 1004,
+          "duplicate_count": 0,
+          "occurrence_id": "occ_a2_rep_7_1790097255466",
+          "repetition": 7,
+          "result": "PASS",
+          "trigger_to_software_audio_ms": 10
+        },
+        {
+          "delivery_delta_ms": 1003,
+          "duplicate_count": 0,
+          "occurrence_id": "occ_a2_rep_8_1790097260822",
+          "repetition": 8,
+          "result": "PASS",
+          "trigger_to_software_audio_ms": 12
+        },
+        {
+          "delivery_delta_ms": 1001,
+          "duplicate_count": 0,
+          "occurrence_id": "occ_a2_rep_9_1790097266175",
+          "repetition": 9,
+          "result": "PASS",
+          "trigger_to_software_audio_ms": 12
+        },
+        {
+          "delivery_delta_ms": 1004,
+          "duplicate_count": 0,
+          "occurrence_id": "occ_a2_rep_10_1790097271544",
+          "repetition": 10,
+          "result": "PASS",
+          "trigger_to_software_audio_ms": 9
+        }
+      ],
+      "repetitions": 10,
+      "result": "PASS",
+      "scenario": "A2_PROCESS_DEATH"
+    },
+    "A3_DUPLICATE_DEFENSE": {
+      "duplicates_rejected": 10,
+      "injections": 10,
+      "result": "PASS",
+      "scenario": "A3_DUPLICATE_DEFENSE"
+    },
+    "A4_STALE_GENERATION": {
+      "cases": 10,
+      "result": "PASS",
+      "scenario": "A4_STALE_GENERATION",
+      "stale_rejections": 10
+    },
+    "A5_SNOOZE": {
+      "child_occurrence_id": "snooze_ea7ab3fa",
+      "contract_semantics": "5_MINUTES",
+      "parent_occurrence_id": "parent_occ_1790097285191",
+      "result": "PASS",
+      "scenario": "A5_SNOOZE"
+    },
+    "A6_DISMISS": {
+      "occurrence_id": "occ_a6_1790097295789",
+      "recurring_schedule_preserved": true,
+      "result": "PASS",
+      "scenario": "A6_DISMISS"
+    },
+    "B1_GUEST_REBOOT": {
+      "details": [
+        {
+          "duplicate_count": 0,
+          "occurrence_id": "occ_b1_rep_1_1790097301137",
+          "repetition": 1,
+          "result": "PASS"
+        },
+        {
+          "duplicate_count": 0,
+          "occurrence_id": "occ_b1_rep_2_1790097361197",
+          "repetition": 2,
+          "result": "PASS"
+        },
+        {
+          "duplicate_count": 0,
+          "occurrence_id": "occ_b1_rep_3_1790097421350",
+          "repetition": 3,
+          "result": "PASS"
+        }
+      ],
+      "repetitions": 3,
+      "result": "PASS",
+      "scenario": "B1_GUEST_REBOOT"
+    },
+    "B2_RECONCILIATION_IDEMPOTENCE": {
+      "invocations": 10,
+      "reconciliation_count": 10,
+      "result": "PASS",
+      "scenario": "B2_RECONCILIATION_IDEMPOTENCE"
+    },
+    "B3_LATE_RECOVERY": {
+      "case_over_10min_result": "OUTCOME_UNKNOWN",
+      "case_under_10min_result": "RECOVERED_LATE",
+      "result": "PASS",
+      "scenario": "B3_LATE_RECOVERY"
+    },
+    "PHASE_11_FORCE_STOP": {
+      "app_woken_by_alarm": false,
+      "causal_classification": "EXPECTED_PLATFORM_CANCELLATION",
+      "package_stopped_state": true,
+      "phase": "PHASE_11_FORCE_STOP",
+      "result": "PASS"
+    },
+    "PHASE_12_READINESS_DECAY": {
+      "causal_classification": "READINESS_OBSERVED",
+      "phase": "PHASE_12_READINESS_DECAY",
+      "result": "PASS"
+    }
+  },
+  "start_time_utc": "2026-09-22T17:12:12Z",
+  "statistical_summary": {
+    "delivery_delta_ms": {
+      "max": 2623,
+      "median": 2001,
+      "min": 1001,
+      "p95": 2623
+    },
+    "duplicate_triggers_accepted": 0,
+    "epistemic_classification": "E1_EMULATOR_EVIDENCE_ONLY",
+    "total_measured_runs": 20,
+    "trigger_to_software_audio_ms": {
+      "max": 19,
+      "median": 11,
+      "min": 6,
+      "p95": 19
+    }
+  }
+}
