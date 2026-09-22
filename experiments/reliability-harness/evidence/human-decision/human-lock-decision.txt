@@ -1,0 +1,18 @@
+ALVORADA HUMAN LOCK DECISION AUDIT REPORT
+=========================================
+SOURCE_OF_AUTHORITY = EXTERNAL_FOUNDER_DECISION
+AGENT_DID_NOT_SELECT_GPU = TRUE
+
+Contract:             ALVORADA_HUMAN_LOCK_DECISION_V1
+Decision:             APPROVE
+Selected GPU:         swiftshader
+Reviewed At UTC:      2026-09-22T14:45:17Z
+Proposal Digest Ref:  5517290ec9b90cdcbc13ad34a1228a1ff422f2a5c2326d622e9f2ae249b411b4
+Catalog Digest Ref:   e9148d7bcdb5124182f87787a78899845aa9a60aefbe5c4bc581539201b4f6ed
+Decision Digest SHA:  5d240bb22205000c5e805fba1c45a99b015e412bebadeb508f88236de74bc5b7
+
+REVIEW CONTEXT:
+  Authority Basis:    EXTERNAL_FOUNDER_GATE
+  Decision Statement: Aprovo o lock com swiftshader.
+
+END OF HUMAN LOCK DECISION REPORT

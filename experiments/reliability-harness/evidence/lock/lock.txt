@@ -1,0 +1,21 @@
+ALVORADA APPROVED EXPERIMENTAL LOCK REPORT
+==========================================
+CLASSIFICATION: APPROVED_EXPERIMENTAL_G1_LOCK
+Contract:           ALVORADA_LOCK_PAYLOAD_V1
+LOCK_DIGEST:        ac243a03caca0333eec85721cbd27f828a001c3b19ed80d7994e33589f065f05
+Proposal Digest:    5517290ec9b90cdcbc13ad34a1228a1ff422f2a5c2326d622e9f2ae249b411b4
+Catalog Digest:     e9148d7bcdb5124182f87787a78899845aa9a60aefbe5c4bc581539201b4f6ed
+Selected GPU Mode:  swiftshader
+
+LOCKED ENVIRONMENT:
+  JDK Major Version:      17
+  Emulator Revision:     37.1.11
+
+HARD LOCKED PACKAGES (5):
+  1. build-tools;36.0.0 -> 36.0.0
+  2. emulator -> 37.1.11
+  3. platform-tools -> 37.0.1
+  4. platforms;android-36 -> 2
+  5. system-images;android-36;default;x86_64 -> 2
+
+END OF APPROVED EXPERIMENTAL LOCK REPORT
