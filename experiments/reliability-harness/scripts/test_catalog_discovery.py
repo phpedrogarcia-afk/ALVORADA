@@ -11,6 +11,7 @@ import unittest
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 from test_catalog_core import *
+from test_catalog_lock_model import *
 
 if __name__ == "__main__":
     unittest.main()

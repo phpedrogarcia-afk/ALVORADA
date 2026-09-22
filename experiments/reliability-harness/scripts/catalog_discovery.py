@@ -34,5 +34,19 @@ from catalog_core import (
     main,
 )
 
+from catalog_lock_model import (
+    CONTRACT_CATALOG_DIGEST_PAYLOAD,
+    CONTRACT_LOCK_PROPOSAL,
+    CONTRACT_HUMAN_DECISION,
+    CONTRACT_LOCK_PAYLOAD,
+    PROPOSAL_STATE_PENDING,
+    create_catalog_digest_payload,
+    compute_catalog_digest,
+    create_lock_proposal,
+    compute_lock_proposal_digest,
+    verify_human_decision,
+    compute_lock_candidate,
+)
+
 if __name__ == "__main__":
     main()
