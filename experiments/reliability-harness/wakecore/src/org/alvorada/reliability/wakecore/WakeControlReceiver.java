@@ -123,6 +123,7 @@ public final class WakeControlReceiver extends BroadcastReceiver {
         } else if (WakeConstants.CMD_RECONCILE.equalsIgnoreCase(cmd)) {
             long mockNow = intent.getLongExtra("mock_now_epoch_ms", 0L);
             WakeBootReceiver.reconcile(context, mockNow > 0, mockNow);
+            store.load();
 
             setResultCode(0);
             setResultData(store.toJsonString());

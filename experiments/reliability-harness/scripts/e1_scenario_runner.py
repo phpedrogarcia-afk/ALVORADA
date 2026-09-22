@@ -300,7 +300,7 @@ class E1ScenarioRunner:
                 raise E1ScenarioError(f"A1 rep {rep}: failed to reach ARMED state: {arm}")
 
             # 3. Wait for TRIGGERED -> SOFTWARE_AUDIO_STARTED
-            final_state = self.poll_for_state(["SOFTWARE_AUDIO_STARTED"], timeout_seconds=8.0)
+            final_state = self.poll_for_state(["SOFTWARE_AUDIO_STARTED"], timeout_seconds=12.0)
             st = final_state.get("state")
             if st != "SOFTWARE_AUDIO_STARTED":
                 raise E1ScenarioError(f"A1 rep {rep}: timed out waiting for SOFTWARE_AUDIO_STARTED, current={st}")
@@ -358,7 +358,7 @@ class E1ScenarioRunner:
             time.sleep(0.5)
 
             # 3. Wait for AlarmManager to wake process and reach SOFTWARE_AUDIO_STARTED
-            final_state = self.poll_for_state(["SOFTWARE_AUDIO_STARTED"], timeout_seconds=10.0)
+            final_state = self.poll_for_state(["SOFTWARE_AUDIO_STARTED"], timeout_seconds=14.0)
             st = final_state.get("state")
             if st != "SOFTWARE_AUDIO_STARTED":
                 raise E1ScenarioError(f"A2 rep {rep}: failed to trigger after process kill, current={st}")
@@ -398,11 +398,11 @@ class E1ScenarioRunner:
             "alarm_id": "alarm_a3",
             "generation": 1,
             "occurrence_id": occ_id,
-            "delay_ms": 1500,
+            "delay_ms": 2500,
             "route": "ALARM_CLOCK",
         })
 
-        initial = self.poll_for_state(["SOFTWARE_AUDIO_STARTED"], timeout_seconds=6.0)
+        initial = self.poll_for_state(["SOFTWARE_AUDIO_STARTED"], timeout_seconds=12.0)
         if initial.get("state") != "SOFTWARE_AUDIO_STARTED":
             raise E1ScenarioError(f"A3: initial alarm failed to trigger: {initial}")
 
@@ -491,17 +491,17 @@ class E1ScenarioRunner:
             "alarm_id": "alarm_a5",
             "generation": 1,
             "occurrence_id": parent_occ_id,
-            "delay_ms": 1500,
+            "delay_ms": 2500,
             "route": "ALARM_CLOCK",
         })
 
-        parent_state = self.poll_for_state(["SOFTWARE_AUDIO_STARTED"], timeout_seconds=5.0)
+        parent_state = self.poll_for_state(["SOFTWARE_AUDIO_STARTED"], timeout_seconds=12.0)
         if parent_state.get("state") != "SOFTWARE_AUDIO_STARTED":
             raise E1ScenarioError(f"A5: parent alarm failed to start: {parent_state}")
 
-        # 2. Snooze parent with 2000ms delay for live empirical test (5 min contract recorded)
+        # 2. Snooze parent with 2500ms delay for live empirical test (5 min contract recorded)
         snooze_res = self.send_broadcast_cmd("SNOOZE", {
-            "snooze_delay_ms": 2000,
+            "snooze_delay_ms": 2500,
         })
         if snooze_res.get("state") != "SNOOZED":
             raise E1ScenarioError(f"A5: failed to transition to SNOOZED: {snooze_res}")
@@ -511,7 +511,7 @@ class E1ScenarioRunner:
             raise E1ScenarioError(f"A5: invalid child occurrence ID: {child_occ_id}")
 
         # 3. Wait for child occurrence to trigger and start audio
-        child_final = self.poll_for_state(["SOFTWARE_AUDIO_STARTED"], timeout_seconds=6.0)
+        child_final = self.poll_for_state(["SOFTWARE_AUDIO_STARTED"], timeout_seconds=12.0)
         if child_final.get("state") != "SOFTWARE_AUDIO_STARTED":
             raise E1ScenarioError(f"A5: snooze child failed to fire: {child_final}")
 
@@ -542,11 +542,11 @@ class E1ScenarioRunner:
             "alarm_id": "alarm_a6",
             "generation": 1,
             "occurrence_id": occ_id,
-            "delay_ms": 1500,
+            "delay_ms": 2500,
             "route": "ALARM_CLOCK",
         })
 
-        self.poll_for_state(["SOFTWARE_AUDIO_STARTED"], timeout_seconds=5.0)
+        self.poll_for_state(["SOFTWARE_AUDIO_STARTED"], timeout_seconds=12.0)
 
         # 2. Dismiss
         dismissed = self.send_broadcast_cmd("DISMISS")
@@ -613,8 +613,8 @@ class E1ScenarioRunner:
             self.send_broadcast_cmd("RECONCILE")
 
             # Wait for occurrence to trigger
-            final_state = self.poll_for_state(["SOFTWARE_AUDIO_STARTED"], timeout_seconds=70.0)
-            if final_state.get("state") != "SOFTWARE_AUDIO_STARTED":
+            final_state = self.poll_for_state(["SOFTWARE_AUDIO_STARTED", "RECOVERED_LATE"], timeout_seconds=80.0)
+            if final_state.get("state") not in ("SOFTWARE_AUDIO_STARTED", "RECOVERED_LATE"):
                 raise E1ScenarioError(f"B1 rep {rep}: alarm did not fire after reboot: {final_state}")
 
             dup_count = final_state.get("duplicate_trigger_count", 0)

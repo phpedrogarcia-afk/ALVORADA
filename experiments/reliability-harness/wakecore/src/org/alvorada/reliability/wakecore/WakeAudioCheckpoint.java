@@ -72,7 +72,9 @@ public final class WakeAudioCheckpoint {
 
         store.softwareAudioStartedAtEpochMs = startedWallMs;
         store.softwareAudioStarted = true;
-        store.state = WakeConstants.STATE_SOFTWARE_AUDIO_STARTED;
+        if (!WakeConstants.STATE_RECOVERED_LATE.equals(store.state)) {
+            store.state = WakeConstants.STATE_SOFTWARE_AUDIO_STARTED;
+        }
 
         if (store.triggeredAtEpochMs > 0) {
             store.triggerToSoftwareAudioMs = startedWallMs - store.triggeredAtEpochMs;
