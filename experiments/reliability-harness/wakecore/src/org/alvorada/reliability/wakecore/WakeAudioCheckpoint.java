@@ -11,16 +11,34 @@ public final class WakeAudioCheckpoint {
 
     private WakeAudioCheckpoint() {}
 
+    public static volatile String sFaultInjection = "NONE";
+
+    public static void setFaultInjection(String fault) {
+        sFaultInjection = (fault != null) ? fault : "NONE";
+    }
+
     public static void executeAudioHandoff(WakeDeviceProtectedStore store) {
         long requestedWallMs = System.currentTimeMillis();
         long requestedMonotonicMs = SystemClock.elapsedRealtime();
 
         store.softwareAudioRequestedAtEpochMs = requestedWallMs;
+        store.softwareAudioCheckpoint = WakeConstants.CHECKPOINT_SOFTWARE_AUDIO_REQUESTED;
+        store.save();
+
         Log.i(TAG, "SOFTWARE_AUDIO_REQUESTED_AT=" + requestedWallMs + " (monotonic=" + requestedMonotonicMs + ")");
 
         byte[] wavBytes = AudioMarker.wavBytes();
         String sha256 = AudioMarker.sha256Hex(wavBytes);
         store.audioMarkerSha256 = sha256;
+
+        String fault = (sFaultInjection != null && !"NONE".equals(sFaultInjection))
+                ? sFaultInjection : store.audioFaultInjection;
+
+        // Check simulated fault: INIT_FAIL
+        if ("INIT_FAIL".equalsIgnoreCase(fault)) {
+            recordAudioFailure(store, "INJECTED_FAULT: simulated AudioTrack initialization failure");
+            return;
+        }
 
         // Execute deterministic software audio playback via AudioTrack
         AudioTrack track = null;
@@ -49,15 +67,80 @@ public final class WakeAudioCheckpoint {
                     AudioTrack.MODE_STATIC,
                     android.media.AudioManager.AUDIO_SESSION_ID_GENERATE);
 
+            // Verify AudioTrack successfully initialized
+            if (track.getState() != AudioTrack.STATE_INITIALIZED) {
+                recordAudioFailure(store, "AudioTrack failed to initialize, state=" + track.getState());
+                return;
+            }
+
+            store.softwareAudioCheckpoint = WakeConstants.CHECKPOINT_SOFTWARE_AUDIO_ENGINE_INITIALIZED;
+            store.save();
+
+            // Check simulated fault: WRITE_FAIL
+            if ("WRITE_FAIL".equalsIgnoreCase(fault)) {
+                recordAudioFailure(store, "INJECTED_FAULT: simulated PCM write failure");
+                return;
+            }
+
             // Write PCM data portion (skip 44-byte WAV header)
             int pcmOffset = 44;
             int pcmLength = wavBytes.length - pcmOffset;
-            if (pcmLength > 0) {
-                track.write(wavBytes, pcmOffset, pcmLength);
-                track.play();
+            if (pcmLength <= 0) {
+                recordAudioFailure(store, "Invalid PCM length: " + pcmLength);
+                return;
             }
-        } catch (Exception e) {
-            Log.w(TAG, "AudioTrack initialization exception (falling back to memory marker verification): " + e.getMessage());
+
+            int written = track.write(wavBytes, pcmOffset, pcmLength);
+            if (written <= 0 || written != pcmLength) {
+                recordAudioFailure(store, "PCM write rejected: expected " + pcmLength + " bytes, written=" + written);
+                return;
+            }
+
+            store.softwareAudioCheckpoint = WakeConstants.CHECKPOINT_SOFTWARE_AUDIO_WRITE_ACCEPTED;
+            store.save();
+
+            // Check simulated fault: PLAY_FAIL
+            if ("PLAY_FAIL".equalsIgnoreCase(fault)) {
+                recordAudioFailure(store, "INJECTED_FAULT: simulated play failure");
+                return;
+            }
+
+            track.play();
+
+            // Verify AudioTrack reports PLAYSTATE_PLAYING
+            if (track.getPlayState() != AudioTrack.PLAYSTATE_PLAYING) {
+                recordAudioFailure(store, "AudioTrack playState not PLAYSTATE_PLAYING, state=" + track.getPlayState());
+                return;
+            }
+
+            // Bounded playback progress verification
+            SystemClock.sleep(25L);
+            int headPosition = track.getPlaybackHeadPosition();
+            Log.d(TAG, "AudioTrack playback head position=" + headPosition);
+
+            long startedWallMs = System.currentTimeMillis();
+            long startedMonotonicMs = SystemClock.elapsedRealtime();
+
+            store.softwareAudioStartedAtEpochMs = startedWallMs;
+            store.softwareAudioStarted = true;
+            store.softwareAudioFailed = false;
+            store.softwareAudioCheckpoint = WakeConstants.CHECKPOINT_SOFTWARE_AUDIO_STARTED;
+            if (!WakeConstants.STATE_RECOVERED_LATE.equals(store.state)) {
+                store.state = WakeConstants.STATE_SOFTWARE_AUDIO_STARTED;
+            }
+
+            if (store.triggeredAtEpochMs > 0) {
+                store.triggerToSoftwareAudioMs = startedWallMs - store.triggeredAtEpochMs;
+            }
+
+            store.save();
+
+            // EPISTEMIC INVARIANT: Log explicit boundary
+            Log.i(TAG, "SOFTWARE_AUDIO_STARTED_AT=" + startedWallMs + " (monotonic=" + startedMonotonicMs + ")");
+            Log.i(TAG, "EPISTEMIC_INVARIANT: SOFTWARE_AUDIO_STARTED=TRUE; AUDIBLE=UNPROVEN; HUMAN_AWAKE=UNPROVEN; SHA256=" + sha256);
+
+        } catch (Throwable t) {
+            recordAudioFailure(store, "AudioTrack exception: " + t.getMessage());
         } finally {
             if (track != null) {
                 try {
@@ -66,24 +149,14 @@ public final class WakeAudioCheckpoint {
                 } catch (Exception ignored) {}
             }
         }
+    }
 
-        long startedWallMs = System.currentTimeMillis();
-        long startedMonotonicMs = SystemClock.elapsedRealtime();
-
-        store.softwareAudioStartedAtEpochMs = startedWallMs;
-        store.softwareAudioStarted = true;
-        if (!WakeConstants.STATE_RECOVERED_LATE.equals(store.state)) {
-            store.state = WakeConstants.STATE_SOFTWARE_AUDIO_STARTED;
-        }
-
-        if (store.triggeredAtEpochMs > 0) {
-            store.triggerToSoftwareAudioMs = startedWallMs - store.triggeredAtEpochMs;
-        }
-
+    private static void recordAudioFailure(WakeDeviceProtectedStore store, String reason) {
+        Log.e(TAG, "SOFTWARE_AUDIO_FAILED: " + reason);
+        store.softwareAudioStarted = false;
+        store.softwareAudioFailed = true;
+        store.softwareAudioCheckpoint = WakeConstants.CHECKPOINT_SOFTWARE_AUDIO_FAILED;
+        store.state = WakeConstants.STATE_SOFTWARE_AUDIO_FAILED;
         store.save();
-
-        // EPISTEMIC INVARIANT: Log explicit boundary
-        Log.i(TAG, "SOFTWARE_AUDIO_STARTED_AT=" + startedWallMs + " (monotonic=" + startedMonotonicMs + ")");
-        Log.i(TAG, "EPISTEMIC_INVARIANT: SOFTWARE_AUDIO_STARTED=TRUE; AUDIBLE=UNPROVEN; HUMAN_AWAKE=UNPROVEN; SHA256=" + sha256);
     }
 }

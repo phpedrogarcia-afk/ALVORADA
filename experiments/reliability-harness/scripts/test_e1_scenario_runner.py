@@ -88,14 +88,31 @@ class TestE1ScenarioRunner(unittest.TestCase):
     @patch.object(E1ScenarioRunner, "get_state")
     @patch.object(E1ScenarioRunner, "send_broadcast_cmd")
     def test_scenario_a4_stale_generation(self, mock_cmd: MagicMock, mock_state: MagicMock) -> None:
-        mock_state.return_value = {
-            "state": "CONFIGURED",
+        state_holder = {
+            "state": "ARMED",
+            "alarm_id": "alarm_a4",
+            "generation": 2,
+            "occurrence_id": "",
             "stale_generation_rejection_count": 10,
+            "future_generation_rejection_count": 10,
+            "invalid_generation_rejection_count": 10,
+            "wrong_alarm_id_rejection_count": 10,
+            "wrong_occurrence_id_rejection_count": 10,
+            "invalid_identity_rejection_count": 10,
         }
+        def fake_cmd(cmd: str, extras: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+            if cmd == "ARM" and extras:
+                state_holder["occurrence_id"] = extras.get("occurrence_id", "")
+            return state_holder
+
+        mock_cmd.side_effect = fake_cmd
+        mock_state.side_effect = lambda: dict(state_holder)
 
         res = self.runner.run_scenario_a4(cases=10)
         self.assertEqual(res["result"], "PASS")
         self.assertEqual(res["stale_rejections"], 10)
+        self.assertEqual(res["future_generation_rejections"], 10)
+        self.assertTrue(res["authority_state_preserved"])
 
     @patch.object(E1ScenarioRunner, "poll_for_state")
     @patch.object(E1ScenarioRunner, "send_broadcast_cmd")
@@ -111,7 +128,9 @@ class TestE1ScenarioRunner(unittest.TestCase):
 
         res = self.runner.run_scenario_a5()
         self.assertEqual(res["result"], "PASS")
-        self.assertEqual(res["contract_semantics"], "5_MINUTES")
+        self.assertEqual(res["production_contract_delay_ms"], 300000)
+        self.assertEqual(res["empirical_test_delay_ms"], 2500)
+        self.assertFalse(res["real_five_minute_wait_executed"])
 
     @patch.object(E1ScenarioRunner, "poll_for_state")
     @patch.object(E1ScenarioRunner, "send_broadcast_cmd")
@@ -158,6 +177,32 @@ class TestE1ScenarioRunner(unittest.TestCase):
         self.assertEqual(res["case_under_10min_result"], "RECOVERED_LATE")
         self.assertEqual(res["case_over_10min_result"], "OUTCOME_UNKNOWN")
 
+    @patch.object(E1ScenarioRunner, "poll_for_state")
+    @patch.object(E1ScenarioRunner, "reset_state")
+    @patch.object(E1ScenarioRunner, "send_broadcast_cmd")
+    def test_audio_failure_injection(self, mock_cmd: MagicMock, mock_reset: MagicMock, mock_poll: MagicMock) -> None:
+        mock_poll.return_value = {
+            "state": "SOFTWARE_AUDIO_FAILED",
+            "software_audio_failed": True,
+            "software_audio_checkpoint": "CHECKPOINT_SOFTWARE_AUDIO_FAILED",
+        }
+        res = self.runner.run_audio_failure_injection()
+        self.assertEqual(res["result"], "PASS")
+        self.assertTrue(res["audio_init_failure_tested"])
+        self.assertTrue(res["audio_write_failure_tested"])
+        self.assertTrue(res["audio_play_failure_tested"])
+        self.assertTrue(res["software_audio_false_positive_closed"])
+
+    @patch.object(E1ScenarioRunner, "get_state")
+    @patch.object(E1ScenarioRunner, "reset_state")
+    @patch.object(E1ScenarioRunner, "send_broadcast_cmd")
+    def test_route_validation(self, mock_cmd: MagicMock, mock_reset: MagicMock, mock_state: MagicMock) -> None:
+        mock_state.return_value = {"state": "CONFIGURED"}
+        res = self.runner.run_route_validation()
+        self.assertEqual(res["result"], "PASS")
+        self.assertTrue(res["route_fail_closed"])
+        self.assertEqual(res["unknown_routes_accepted"], 0)
+
     @patch.object(E1ScenarioRunner, "get_app_pid")
     @patch.object(E1ScenarioRunner, "run_adb")
     @patch.object(E1ScenarioRunner, "send_broadcast_cmd")
@@ -183,6 +228,7 @@ class TestE1ScenarioRunner(unittest.TestCase):
         res = self.runner.run_phase_12_readiness_decay()
         self.assertEqual(res["result"], "PASS")
         self.assertEqual(res["causal_classification"], "READINESS_DECAY_ENFORCED")
+        self.assertEqual(res["readiness_decay_result"], "OBSERVED")
 
     @patch.object(E1ScenarioRunner, "run_scenario_a1")
     @patch.object(E1ScenarioRunner, "run_scenario_a2")
@@ -192,12 +238,16 @@ class TestE1ScenarioRunner(unittest.TestCase):
     @patch.object(E1ScenarioRunner, "run_scenario_a6")
     @patch.object(E1ScenarioRunner, "run_scenario_b2")
     @patch.object(E1ScenarioRunner, "run_scenario_b3")
+    @patch.object(E1ScenarioRunner, "run_audio_failure_injection")
+    @patch.object(E1ScenarioRunner, "run_route_validation")
     @patch.object(E1ScenarioRunner, "run_phase_11_force_stop")
     @patch.object(E1ScenarioRunner, "run_phase_12_readiness_decay")
     def test_run_all_end_to_end(
         self,
         mock_p12: MagicMock,
         mock_p11: MagicMock,
+        mock_route: MagicMock,
+        mock_audio: MagicMock,
         mock_b3: MagicMock,
         mock_b2: MagicMock,
         mock_a6: MagicMock,
@@ -219,15 +269,24 @@ class TestE1ScenarioRunner(unittest.TestCase):
         }
         mock_a3.return_value = {"result": "PASS", "duplicates_rejected": 10}
         mock_a4.return_value = {"result": "PASS", "stale_rejections": 10}
-        mock_a5.return_value = {"result": "PASS"}
+        mock_a5.return_value = {"result": "PASS", "production_contract_delay_ms": 300000, "empirical_test_delay_ms": 2500}
         mock_a6.return_value = {"result": "PASS"}
         mock_b2.return_value = {"result": "PASS"}
         mock_b3.return_value = {"result": "PASS"}
+        mock_audio.return_value = {"result": "PASS"}
+        mock_route.return_value = {"result": "PASS"}
         mock_p11.return_value = {"result": "PASS", "causal_classification": "EXPECTED_PLATFORM_CANCELLATION"}
         mock_p12.return_value = {"result": "PASS", "causal_classification": "READINESS_DECAY_ENFORCED"}
 
         report = self.runner.run_all(skip_reboot=True)
         self.assertEqual(report["overall_status"], "PASS")
+
+        # Verify stratified statistics
+        stats = report["statistical_summary"]
+        self.assertIn("a1_alarm_clock", stats)
+        self.assertIn("a2_exact_allow_idle", stats)
+        self.assertIn("combined", stats)
+        self.assertEqual(stats["old_statistical_derivation_superseded"], "RUN_35758945392_SUPERSEDED")
 
         # Verify artifacts were created on disk
         self.assertTrue((self.output_dir / "e1-scenario-report.json").is_file())

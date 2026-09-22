@@ -55,24 +55,46 @@ public final class WakeControlReceiver extends BroadcastReceiver {
                 targetEpochMs = System.currentTimeMillis() + delayMs;
             }
 
-            String route = intent.getStringExtra("route") != null
-                    ? intent.getStringExtra("route") : WakeConstants.ROUTE_ALARM_CLOCK;
+            // Do not override invalid route with default; preserve caller's route string
+            String route = intent.hasExtra("route")
+                    ? intent.getStringExtra("route")
+                    : (store.route.isEmpty() ? WakeConstants.ROUTE_ALARM_CLOCK : store.route);
 
             boolean ok = scheduler.scheduleOccurrence(alarmId, generation, occurrenceId, targetEpochMs, route);
             setResultCode(ok ? 0 : 2);
             setResultData(store.toJsonString());
 
         } else if (WakeConstants.CMD_TRIGGER_INJECT.equalsIgnoreCase(cmd)) {
+            String injAlarmId = intent.getStringExtra("alarm_id");
+            long injGen = intent.getLongExtra("generation", 0L);
+            String injOccId = intent.getStringExtra("occurrence_id");
+            long injTarget = intent.getLongExtra("target_epoch_ms", 0L);
+
             Intent triggerIntent = new Intent(context, WakeAlarmReceiver.class);
             triggerIntent.setAction(WakeConstants.ACTION_ALARM_TRIGGER);
-            triggerIntent.putExtra("alarm_id", intent.getStringExtra("alarm_id"));
-            triggerIntent.putExtra("generation", intent.getLongExtra("generation", 0L));
-            triggerIntent.putExtra("occurrence_id", intent.getStringExtra("occurrence_id"));
-            triggerIntent.putExtra("target_epoch_ms", intent.getLongExtra("target_epoch_ms", 0L));
+            if (injAlarmId != null && injOccId != null) {
+                triggerIntent.setData(android.net.Uri.parse("alvorada://alarm/" + injAlarmId + "/" + injGen + "/" + injOccId));
+            }
+            triggerIntent.putExtra("alarm_id", injAlarmId);
+            triggerIntent.putExtra("generation", injGen);
+            triggerIntent.putExtra("occurrence_id", injOccId);
+            triggerIntent.putExtra("target_epoch_ms", injTarget);
             context.sendBroadcast(triggerIntent);
 
             setResultCode(0);
             setResultData("TRIGGER_INJECTED");
+
+        } else if (WakeConstants.CMD_SET_AUDIO_FAULT.equalsIgnoreCase(cmd)) {
+            String fault = intent.getStringExtra("fault");
+            if (fault == null) {
+                fault = intent.getStringExtra("fault_mode");
+            }
+            store.audioFaultInjection = (fault != null) ? fault : "NONE";
+            WakeAudioCheckpoint.setFaultInjection(store.audioFaultInjection);
+            store.save();
+
+            setResultCode(0);
+            setResultData(store.toJsonString());
 
         } else if (WakeConstants.CMD_SNOOZE.equalsIgnoreCase(cmd)) {
             // A5 Snooze semantics

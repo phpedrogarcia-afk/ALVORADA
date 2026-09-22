@@ -181,6 +181,7 @@ jobs:
               'A1_BASELINE', 'A2_PROCESS_DEATH', 'A3_DUPLICATE_DEFENSE',
               'A4_STALE_GENERATION', 'A5_SNOOZE', 'A6_DISMISS',
               'B1_GUEST_REBOOT', 'B2_RECONCILIATION_IDEMPOTENCE', 'B3_LATE_RECOVERY',
+              'AUDIO_FAILURE_INJECTION', 'ROUTE_VALIDATION',
               'PHASE_11_FORCE_STOP', 'PHASE_12_READINESS_DECAY'
           ]
           for s in required:
@@ -190,6 +191,9 @@ jobs:
           stats = rep.get('statistical_summary', {})
           if stats.get('duplicate_triggers_accepted', -1) != 0:
               print(f'ERROR: duplicate triggers accepted != 0: {stats.get(\"duplicate_triggers_accepted\")}', file=sys.stderr)
+              sys.exit(1)
+          if 'a1_alarm_clock' not in stats or 'a2_exact_allow_idle' not in stats or 'combined' not in stats:
+              print('ERROR: stratified statistics missing from statistical_summary', file=sys.stderr)
               sys.exit(1)
           print('ALL_E1_RELIABILITY_SCENARIOS_VERIFIED_PASS=TRUE')
           "

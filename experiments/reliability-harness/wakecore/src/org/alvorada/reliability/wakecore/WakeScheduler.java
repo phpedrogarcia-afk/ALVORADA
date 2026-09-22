@@ -43,8 +43,16 @@ public final class WakeScheduler {
             return false;
         }
 
+        // F-05: Strict Route Validation - fail closed on unknown or invalid route
+        if (route == null || (!WakeConstants.ROUTE_ALARM_CLOCK.equals(route) && !WakeConstants.ROUTE_EXACT_ALLOW_IDLE.equals(route))) {
+            Log.e(TAG, "INVALID_ROUTE_REJECTED: route must be strictly ALARM_CLOCK or EXACT_ALLOW_IDLE, got: " + route);
+            return false;
+        }
+
+        // F-01: Harden PendingIntent identity with deterministic unique data URI
         Intent triggerIntent = new Intent(context, WakeAlarmReceiver.class);
         triggerIntent.setAction(WakeConstants.ACTION_ALARM_TRIGGER);
+        triggerIntent.setData(android.net.Uri.parse("alvorada://alarm/" + alarmId + "/" + generation + "/" + occurrenceId));
         triggerIntent.putExtra("alarm_id", alarmId);
         triggerIntent.putExtra("generation", generation);
         triggerIntent.putExtra("occurrence_id", occurrenceId);
@@ -63,10 +71,11 @@ public final class WakeScheduler {
                 context, requestCode, triggerIntent, flags);
 
         try {
-            if (WakeConstants.ROUTE_ALARM_CLOCK.equalsIgnoreCase(route)) {
+            if (WakeConstants.ROUTE_ALARM_CLOCK.equals(route)) {
                 // ALARM_CLOCK Route
                 Intent showIntent = new Intent(context, WakeControlReceiver.class);
                 showIntent.setAction(WakeConstants.ACTION_COMMAND);
+                showIntent.setData(android.net.Uri.parse("alvorada://show/" + alarmId + "/" + generation + "/" + occurrenceId));
                 PendingIntent showPendingIntent = PendingIntent.getBroadcast(
                         context, requestCode + 1, showIntent, flags);
 
@@ -74,11 +83,14 @@ public final class WakeScheduler {
                         targetEpochMs, showPendingIntent);
                 alarmManager.setAlarmClock(info, pendingIntent);
                 Log.d(TAG, "Scheduled ALARM_CLOCK at " + targetEpochMs + " for occurrence " + occurrenceId);
-            } else {
+            } else if (WakeConstants.ROUTE_EXACT_ALLOW_IDLE.equals(route)) {
                 // EXACT_ALLOW_IDLE Route
                 alarmManager.setExactAndAllowWhileIdle(
                         AlarmManager.RTC_WAKEUP, targetEpochMs, pendingIntent);
                 Log.d(TAG, "Scheduled EXACT_ALLOW_IDLE at " + targetEpochMs + " for occurrence " + occurrenceId);
+            } else {
+                // Defense-in-depth: impossible due to route validation above
+                return false;
             }
 
             // Record ARMED state only after successful system call
@@ -105,10 +117,13 @@ public final class WakeScheduler {
         }
     }
 
-    public void cancelOccurrence(String occurrenceId) {
-        if (alarmManager == null) return;
+    public void cancelOccurrence(String alarmId, long generation, String occurrenceId) {
+        if (alarmManager == null || occurrenceId == null) return;
         Intent triggerIntent = new Intent(context, WakeAlarmReceiver.class);
         triggerIntent.setAction(WakeConstants.ACTION_ALARM_TRIGGER);
+        if (alarmId != null && !alarmId.isEmpty() && generation > 0) {
+            triggerIntent.setData(android.net.Uri.parse("alvorada://alarm/" + alarmId + "/" + generation + "/" + occurrenceId));
+        }
         int requestCode = Math.abs(occurrenceId.hashCode());
         int flags = PendingIntent.FLAG_NO_CREATE;
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
@@ -120,5 +135,9 @@ public final class WakeScheduler {
             existing.cancel();
             Log.d(TAG, "Cancelled alarm for occurrence " + occurrenceId);
         }
+    }
+
+    public void cancelOccurrence(String occurrenceId) {
+        cancelOccurrence(store.alarmId, store.generation, occurrenceId);
     }
 }

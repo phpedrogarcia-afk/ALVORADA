@@ -38,8 +38,24 @@ public final class WakeAlarmReceiver extends BroadcastReceiver {
         try {
             WakeDeviceProtectedStore store = new WakeDeviceProtectedStore(context);
 
-            // 1. Stale Generation Defense
-            if (generation > 0 && store.generation > 0 && generation < store.generation) {
+            // 1. Mandatory Identity Non-Empty Validation
+            if (alarmId == null || alarmId.trim().isEmpty() || occurrenceId == null || occurrenceId.trim().isEmpty()) {
+                store.invalidIdentityRejectionCount++;
+                Log.w(TAG, "INVALID_IDENTITY_REJECTED: null or empty alarm_id/occurrence_id [alarm_id="
+                        + alarmId + ", occurrence_id=" + occurrenceId + "]");
+                store.save();
+                return;
+            }
+
+            // 2. Generation Authority Validation
+            if (generation <= 0) {
+                store.invalidGenerationRejectionCount++;
+                Log.w(TAG, "INVALID_GENERATION_REJECTED: generation=" + generation + " <= 0");
+                store.save();
+                return;
+            }
+
+            if (generation < store.generation) {
                 store.staleGenerationRejectionCount++;
                 Log.w(TAG, "STALE_GENERATION_REJECTED: received gen " + generation
                         + " < active gen " + store.generation
@@ -48,9 +64,27 @@ public final class WakeAlarmReceiver extends BroadcastReceiver {
                 return;
             }
 
-            // 2. Duplicate Trigger Defense
-            boolean isParentOccurrence = occurrenceId != null
-                    && store.parentOccurrenceId != null
+            if (generation > store.generation) {
+                store.futureGenerationRejectionCount++;
+                Log.w(TAG, "FUTURE_GENERATION_REJECTED: received gen " + generation
+                        + " > active gen " + store.generation
+                        + ", rejection count=" + store.futureGenerationRejectionCount);
+                store.save();
+                return;
+            }
+
+            // 3. Alarm ID Authority Validation
+            if (!alarmId.equals(store.alarmId)) {
+                store.wrongAlarmIdRejectionCount++;
+                Log.w(TAG, "WRONG_ALARM_ID_REJECTED: received alarm_id " + alarmId
+                        + " != authoritative " + store.alarmId);
+                store.save();
+                return;
+            }
+
+            // 4. Duplicate / Superseded Parent Defense
+            boolean isParentOccurrence = store.parentOccurrenceId != null
+                    && !store.parentOccurrenceId.isEmpty()
                     && occurrenceId.equals(store.parentOccurrenceId);
             if (isParentOccurrence) {
                 store.duplicateTriggerCount++;
@@ -61,13 +95,23 @@ public final class WakeAlarmReceiver extends BroadcastReceiver {
                 return;
             }
 
-            boolean isSameOccurrence = occurrenceId != null && occurrenceId.equals(store.occurrenceId);
+            // 5. Occurrence ID Authority Validation
+            if (!occurrenceId.equals(store.occurrenceId)) {
+                store.wrongOccurrenceIdRejectionCount++;
+                Log.w(TAG, "WRONG_OCCURRENCE_ID_REJECTED: received occurrence " + occurrenceId
+                        + " != authoritative " + store.occurrenceId);
+                store.save();
+                return;
+            }
+
+            // 6. Duplicate Callback Defense on Authoritative Occurrence
             boolean alreadyTriggered = WakeConstants.STATE_TRIGGERED.equals(store.state)
                     || WakeConstants.STATE_SOFTWARE_AUDIO_STARTED.equals(store.state)
+                    || WakeConstants.STATE_SOFTWARE_AUDIO_FAILED.equals(store.state)
                     || WakeConstants.STATE_DISMISSED.equals(store.state)
                     || WakeConstants.STATE_RECOVERED_LATE.equals(store.state);
 
-            if (isSameOccurrence && alreadyTriggered) {
+            if (alreadyTriggered) {
                 store.duplicateTriggerCount++;
                 Log.w(TAG, "DUPLICATE_TRIGGER_REJECTED: occurrence " + occurrenceId
                         + " already in state " + store.state
@@ -76,11 +120,14 @@ public final class WakeAlarmReceiver extends BroadcastReceiver {
                 return;
             }
 
-            // 3. Valid Trigger Accepted
+            // 7. Verify Triggerable State (ARMED or SNOOZED)
+            if (!WakeConstants.STATE_ARMED.equals(store.state) && !WakeConstants.STATE_SNOOZED.equals(store.state)) {
+                Log.w(TAG, "INVALID_STATE_FOR_TRIGGER: state=" + store.state + ", occurrence=" + occurrenceId);
+                return;
+            }
+
+            // 8. Legitimate Trigger Accepted - ONLY NOW mutate state
             Log.i(TAG, "VALID_TRIGGER_ACCEPTED for occurrence " + occurrenceId + " (gen " + generation + ")");
-            store.alarmId = (alarmId != null) ? alarmId : store.alarmId;
-            store.generation = (generation > 0) ? generation : store.generation;
-            store.occurrenceId = (occurrenceId != null) ? occurrenceId : store.occurrenceId;
             store.state = WakeConstants.STATE_TRIGGERED;
             store.triggeredAtEpochMs = triggerWallMs;
             store.triggeredAtMonotonicMs = triggerMonotonicMs;
@@ -92,7 +139,7 @@ public final class WakeAlarmReceiver extends BroadcastReceiver {
 
             store.save();
 
-            // 4. Enter Software Audio Checkpoint Path
+            // 9. Enter Software Audio Checkpoint Path
             WakeAudioCheckpoint.executeAudioHandoff(store);
 
         } finally {

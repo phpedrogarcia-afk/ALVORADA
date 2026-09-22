@@ -11,11 +11,12 @@
     "accounting_integrity_note": "Previous campaign accounting recorded without revisionism; 6 runs were consumed."
   },
   "e1_proof_campaign_001": {
-    "status": "COMPLETED_PASS",
+    "status": "IN_PROGRESS_FORENSIC_R1",
     "ci_budget": 6,
     "ci_runs_dispatched": 3,
     "ci_budget_remaining": 3,
     "max_external_ci_runs": 6,
+    "forensic_r1_note": "Forensic audit repair active: F-01 authoritative trigger identity, F-02 software audio fail-closed, F-03 automatic boot reconciliation, F-04 route-stratified nearest-rank statistics, F-05 route fail-closed, F-06 snooze delay clarity, F-07 readiness decay observation.",
     "runs": [
       {
         "run_number": 1,
@@ -36,9 +37,9 @@
         "run_id": "35758945392",
         "commit_sha": "8577f1e24a2d387bea5440609deda785ae007f2b",
         "outcome": "ALL_PASS",
-        "diagnosis": "All scenarios A1-A6, B1-B3, Phase 11, Phase 12 verified PASS on locked reference runner."
+        "diagnosis": "All scenarios A1-A6, B1-B3, Phase 11, Phase 12 verified PASS on locked reference runner. Statistical derivation superseded by Forensic R1 nearest-rank formula."
       }
     ],
-    "verification_result": "G1_E1_CORE_RELIABILITY_WAVE_A = PASS"
+    "verification_result": "IN_PROGRESS_FORENSIC_R1"
   }
 }

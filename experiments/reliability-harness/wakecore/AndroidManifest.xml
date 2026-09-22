@@ -21,24 +21,23 @@
         android:hasCode="true"
         android:directBootAware="true">
 
-        <!-- Alarm trigger receiver (called by AlarmManager) -->
+        <!-- Alarm trigger receiver (called by AlarmManager via explicit component) -->
         <receiver
             android:name=".WakeAlarmReceiver"
-            android:exported="true"
+            android:exported="false"
             android:directBootAware="true">
             <intent-filter>
                 <action android:name="org.alvorada.reliability.wakecore.ALARM_TRIGGER" />
             </intent-filter>
         </receiver>
 
-        <!-- Boot receiver (called upon guest reboot / Direct Boot) -->
+        <!-- Boot receiver (called upon guest reboot) -->
         <receiver
             android:name=".WakeBootReceiver"
             android:exported="true"
             android:directBootAware="true">
             <intent-filter>
                 <action android:name="android.intent.action.BOOT_COMPLETED" />
-                <action android:name="android.intent.action.LOCKED_BOOT_COMPLETED" />
             </intent-filter>
         </receiver>
 

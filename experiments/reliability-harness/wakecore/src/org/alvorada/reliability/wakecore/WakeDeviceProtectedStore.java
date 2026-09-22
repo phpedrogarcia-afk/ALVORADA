@@ -44,13 +44,30 @@ public final class WakeDeviceProtectedStore {
     // Counters & observations
     public int duplicateTriggerCount = 0;
     public int staleGenerationRejectionCount = 0;
+    public int futureGenerationRejectionCount = 0;
+    public int invalidGenerationRejectionCount = 0;
+    public int wrongAlarmIdRejectionCount = 0;
+    public int wrongOccurrenceIdRejectionCount = 0;
+    public int invalidIdentityRejectionCount = 0;
+
     public int reconciliationCount = 0;
     public String reconciliationResult = "NONE";
     public String fallbackSoundId = "synthetic_wav_marker";
     public String audioMarkerSha256 = "";
 
-    // Invariant verification flag (strictly software start, NEVER physical audible)
+    // F-02 Software audio checkpoints & failure injection
     public boolean softwareAudioStarted = false;
+    public boolean softwareAudioFailed = false;
+    public String softwareAudioCheckpoint = WakeConstants.CHECKPOINT_NONE;
+    public String audioFaultInjection = "NONE";
+
+    // F-03 Boot receiver evidence fields
+    public long bootReceiverInvocationEpochMs = 0L;
+    public String bootReceivedAction = "";
+    public long reconciliationStartEpochMs = 0L;
+    public long reconciliationEndEpochMs = 0L;
+    public String preReconciliationState = "";
+    public String postReconciliationResult = "";
 
     private final Context deviceProtectedContext;
 
@@ -130,10 +147,26 @@ public final class WakeDeviceProtectedStore {
         triggerToSoftwareAudioMs = 0L;
         duplicateTriggerCount = 0;
         staleGenerationRejectionCount = 0;
+        futureGenerationRejectionCount = 0;
+        invalidGenerationRejectionCount = 0;
+        wrongAlarmIdRejectionCount = 0;
+        wrongOccurrenceIdRejectionCount = 0;
+        invalidIdentityRejectionCount = 0;
+
         reconciliationCount = 0;
         reconciliationResult = "NONE";
         softwareAudioStarted = false;
+        softwareAudioFailed = false;
+        softwareAudioCheckpoint = WakeConstants.CHECKPOINT_NONE;
+        audioFaultInjection = "NONE";
         audioMarkerSha256 = "";
+
+        bootReceiverInvocationEpochMs = 0L;
+        bootReceivedAction = "";
+        reconciliationStartEpochMs = 0L;
+        reconciliationEndEpochMs = 0L;
+        preReconciliationState = "";
+        postReconciliationResult = "";
         save();
     }
 
@@ -166,12 +199,29 @@ public final class WakeDeviceProtectedStore {
 
             obj.put("duplicate_trigger_count", duplicateTriggerCount);
             obj.put("stale_generation_rejection_count", staleGenerationRejectionCount);
+            obj.put("future_generation_rejection_count", futureGenerationRejectionCount);
+            obj.put("invalid_generation_rejection_count", invalidGenerationRejectionCount);
+            obj.put("wrong_alarm_id_rejection_count", wrongAlarmIdRejectionCount);
+            obj.put("wrong_occurrence_id_rejection_count", wrongOccurrenceIdRejectionCount);
+            obj.put("invalid_identity_rejection_count", invalidIdentityRejectionCount);
+
             obj.put("reconciliation_count", reconciliationCount);
             obj.put("reconciliation_result", reconciliationResult);
             obj.put("fallback_sound_id", fallbackSoundId);
             obj.put("audio_marker_sha256", audioMarkerSha256);
 
             obj.put("software_audio_started", softwareAudioStarted);
+            obj.put("software_audio_failed", softwareAudioFailed);
+            obj.put("software_audio_checkpoint", softwareAudioCheckpoint);
+            obj.put("audio_fault_injection", audioFaultInjection);
+
+            obj.put("boot_receiver_invocation_epoch_ms", bootReceiverInvocationEpochMs);
+            obj.put("boot_received_action", bootReceivedAction);
+            obj.put("reconciliation_start_epoch_ms", reconciliationStartEpochMs);
+            obj.put("reconciliation_end_epoch_ms", reconciliationEndEpochMs);
+            obj.put("pre_reconciliation_state", preReconciliationState);
+            obj.put("post_reconciliation_result", postReconciliationResult);
+
             // Invariant note: audible is NEVER true in software adapter
             obj.put("audible_claimed", false);
             obj.put("human_awake_claimed", false);
@@ -210,11 +260,27 @@ public final class WakeDeviceProtectedStore {
 
             duplicateTriggerCount = obj.optInt("duplicate_trigger_count", 0);
             staleGenerationRejectionCount = obj.optInt("stale_generation_rejection_count", 0);
+            futureGenerationRejectionCount = obj.optInt("future_generation_rejection_count", 0);
+            invalidGenerationRejectionCount = obj.optInt("invalid_generation_rejection_count", 0);
+            wrongAlarmIdRejectionCount = obj.optInt("wrong_alarm_id_rejection_count", 0);
+            wrongOccurrenceIdRejectionCount = obj.optInt("wrong_occurrence_id_rejection_count", 0);
+            invalidIdentityRejectionCount = obj.optInt("invalid_identity_rejection_count", 0);
+
             reconciliationCount = obj.optInt("reconciliation_count", 0);
             reconciliationResult = obj.optString("reconciliation_result", "NONE");
             fallbackSoundId = obj.optString("fallback_sound_id", "synthetic_wav_marker");
             audioMarkerSha256 = obj.optString("audio_marker_sha256", "");
             softwareAudioStarted = obj.optBoolean("software_audio_started", false);
+            softwareAudioFailed = obj.optBoolean("software_audio_failed", false);
+            softwareAudioCheckpoint = obj.optString("software_audio_checkpoint", WakeConstants.CHECKPOINT_NONE);
+            audioFaultInjection = obj.optString("audio_fault_injection", "NONE");
+
+            bootReceiverInvocationEpochMs = obj.optLong("boot_receiver_invocation_epoch_ms", 0L);
+            bootReceivedAction = obj.optString("boot_received_action", "");
+            reconciliationStartEpochMs = obj.optLong("reconciliation_start_epoch_ms", 0L);
+            reconciliationEndEpochMs = obj.optLong("reconciliation_end_epoch_ms", 0L);
+            preReconciliationState = obj.optString("pre_reconciliation_state", "");
+            postReconciliationResult = obj.optString("post_reconciliation_result", "");
         } catch (JSONException e) {
             Log.e(TAG, "Error parsing state JSON", e);
         }

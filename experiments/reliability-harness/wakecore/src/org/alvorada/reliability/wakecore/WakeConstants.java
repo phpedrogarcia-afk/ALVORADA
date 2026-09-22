@@ -20,6 +20,7 @@ public final class WakeConstants {
     public static final String CMD_DUMP_STATE = "DUMP_STATE";
     public static final String CMD_RESET = "RESET";
     public static final String CMD_SET_MOCK_TIME = "SET_MOCK_TIME";
+    public static final String CMD_SET_AUDIO_FAULT = "SET_AUDIO_FAULT";
 
     // States
     public static final String STATE_IDLE = "IDLE";
@@ -27,10 +28,19 @@ public final class WakeConstants {
     public static final String STATE_ARMED = "ARMED";
     public static final String STATE_TRIGGERED = "TRIGGERED";
     public static final String STATE_SOFTWARE_AUDIO_STARTED = "SOFTWARE_AUDIO_STARTED";
+    public static final String STATE_SOFTWARE_AUDIO_FAILED = "SOFTWARE_AUDIO_FAILED";
     public static final String STATE_SNOOZED = "SNOOZED";
     public static final String STATE_DISMISSED = "DISMISSED";
     public static final String STATE_RECOVERED_LATE = "RECOVERED_LATE";
     public static final String STATE_OUTCOME_UNKNOWN = "OUTCOME_UNKNOWN";
+
+    // Audio Checkpoints
+    public static final String CHECKPOINT_NONE = "NONE";
+    public static final String CHECKPOINT_SOFTWARE_AUDIO_REQUESTED = "SOFTWARE_AUDIO_REQUESTED";
+    public static final String CHECKPOINT_SOFTWARE_AUDIO_ENGINE_INITIALIZED = "SOFTWARE_AUDIO_ENGINE_INITIALIZED";
+    public static final String CHECKPOINT_SOFTWARE_AUDIO_WRITE_ACCEPTED = "SOFTWARE_AUDIO_WRITE_ACCEPTED";
+    public static final String CHECKPOINT_SOFTWARE_AUDIO_STARTED = "SOFTWARE_AUDIO_STARTED";
+    public static final String CHECKPOINT_SOFTWARE_AUDIO_FAILED = "SOFTWARE_AUDIO_FAILED";
 
     // Scheduling Routes
     public static final String ROUTE_ALARM_CLOCK = "ALARM_CLOCK";
