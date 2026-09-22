@@ -131,28 +131,51 @@ class TestWave2AvdManager(unittest.TestCase):
         self.assertEqual(res["ram_mb"], 2048)
         self.assertEqual(res["gpu_mode"], "swiftshader")
 
-    def test_verify_p1_fails_on_cpu_less_than_2(self) -> None:
+    def test_verify_p1_fails_on_cpu_mismatch(self) -> None:
         desc = self.avd_home / f"{AVD_NAME_DEFAULT}.ini"
         avd_dir = self.avd_home / f"{AVD_NAME_DEFAULT}.avd"
         avd_dir.mkdir(parents=True, exist_ok=True)
         desc.write_text(f"path={avd_dir}\n")
 
         config_file = avd_dir / "config.ini"
-        write_ini_file(
-            config_file,
-            {
-                "image.sysdir.1": "system-images/android-36/default/x86_64",
-                "abi.type": "x86_64",
-                "hw.cpu.ncore": "1",
-                "hw.ramSize": "2048",
-                "hw.gpu.mode": "swiftshader",
-                "hw.gpu.enabled": "yes",
-            },
-        )
+        for bad_cpu in ("1", "3", "4"):
+            write_ini_file(
+                config_file,
+                {
+                    "image.sysdir.1": "system-images/android-36/default/x86_64",
+                    "abi.type": "x86_64",
+                    "hw.cpu.ncore": bad_cpu,
+                    "hw.ramSize": "2048",
+                    "hw.gpu.mode": "swiftshader",
+                    "hw.gpu.enabled": "yes",
+                },
+            )
+            with self.assertRaises(AvdInspectionError) as ctx:
+                self.mgr.verify_p1()
+            self.assertIn(f"hw.cpu.ncore ({bad_cpu}) does not match locked", str(ctx.exception))
 
-        with self.assertRaises(AvdInspectionError) as ctx:
-            self.mgr.verify_p1()
-        self.assertIn("hw.cpu.ncore (1) is less than locked", str(ctx.exception))
+    def test_verify_p1_fails_on_ram_mismatch(self) -> None:
+        desc = self.avd_home / f"{AVD_NAME_DEFAULT}.ini"
+        avd_dir = self.avd_home / f"{AVD_NAME_DEFAULT}.avd"
+        avd_dir.mkdir(parents=True, exist_ok=True)
+        desc.write_text(f"path={avd_dir}\n")
+
+        config_file = avd_dir / "config.ini"
+        for bad_ram in ("1024", "4096"):
+            write_ini_file(
+                config_file,
+                {
+                    "image.sysdir.1": "system-images/android-36/default/x86_64",
+                    "abi.type": "x86_64",
+                    "hw.cpu.ncore": "2",
+                    "hw.ramSize": bad_ram,
+                    "hw.gpu.mode": "swiftshader",
+                    "hw.gpu.enabled": "yes",
+                },
+            )
+            with self.assertRaises(AvdInspectionError) as ctx:
+                self.mgr.verify_p1()
+            self.assertIn(f"hw.ramSize ({bad_ram}) does not match locked", str(ctx.exception))
 
     def test_verify_p1_fails_on_gpu_mode_mismatch(self) -> None:
         desc = self.avd_home / f"{AVD_NAME_DEFAULT}.ini"

@@ -303,9 +303,9 @@ class Wave2AvdManager:
             cpu_cores = int(config.get("hw.cpu.ncore", "0"))
         except ValueError:
             raise AvdInspectionError(f"P1_FAILED: hw.cpu.ncore invalid: {config.get('hw.cpu.ncore')}")
-        if cpu_cores < LOCKED_CPU_CORES:
+        if cpu_cores != LOCKED_CPU_CORES:
             raise AvdInspectionError(
-                f"P1_FAILED: hw.cpu.ncore ({cpu_cores}) is less than locked ({LOCKED_CPU_CORES})"
+                f"P1_FAILED: hw.cpu.ncore ({cpu_cores}) does not match locked ({LOCKED_CPU_CORES})"
             )
 
         # 2. RAM size
@@ -313,9 +313,9 @@ class Wave2AvdManager:
             ram_mb = int(config.get("hw.ramSize", "0"))
         except ValueError:
             raise AvdInspectionError(f"P1_FAILED: hw.ramSize invalid: {config.get('hw.ramSize')}")
-        if ram_mb < LOCKED_RAM_MB:
+        if ram_mb != LOCKED_RAM_MB:
             raise AvdInspectionError(
-                f"P1_FAILED: hw.ramSize ({ram_mb}) is less than locked ({LOCKED_RAM_MB})"
+                f"P1_FAILED: hw.ramSize ({ram_mb}) does not match locked ({LOCKED_RAM_MB})"
             )
 
         # 3. GPU mode

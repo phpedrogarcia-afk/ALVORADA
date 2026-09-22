@@ -1,0 +1,88 @@
+ALVORADA G1 P1-P10 PROOF SEQUENCE REPORT
+========================================
+Contract:                 ALVORADA_P1_P10_PROOF_SEQUENCE_V1
+Campaign:                 ALVORADA_G1_POST_FOUNDER_APPROVAL_001
+Overall Status:           PASS
+Repository Commit SHA:    4e28a3017b638f3861d83d5afcf973022ee049d8
+CI Run ID:                35746460356
+AVD Name:                 alvorada_e1_api36_x86_64
+System Image Package:     system-images;android-36;default;x86_64
+Selected GPU Mode:        swiftshader
+
+GATE EXECUTION LEDGER
+---------------------
+  [P1] PASS
+       contract: ALVORADA_P1_AVD_CONFIG_V1
+       avd_name: alvorada_e1_api36_x86_64
+       system_image_package: system-images;android-36;default;x86_64
+       system_image_path: /usr/local/lib/android/sdk/system-images/android-36/default/x86_64
+       cpu_cores: 2
+       ram_mb: 2048
+       gpu_mode: swiftshader
+       descriptor_path: /home/runner/.android/avd/alvorada_e1_api36_x86_64.ini
+       config_path: /home/runner/.android/avd/alvorada_e1_api36_x86_64.avd/config.ini
+       start_time_utc: 2026-09-22T15:20:00.968684+00:00
+       end_time_utc: 2026-09-22T15:20:00.969167+00:00
+  [P2] PASS
+       emulator_binary: /usr/local/lib/android/sdk/emulator/emulator
+       pid: 3042
+       start_time_utc: 2026-09-22T15:20:00.969197+00:00
+       end_time_utc: 2026-09-22T15:20:01.969764+00:00
+  [P3] PASS
+       monitored_window_seconds: 20
+       pid: 3042
+       start_time_utc: 2026-09-22T15:20:01.969821+00:00
+       end_time_utc: 2026-09-22T15:20:21.970930+00:00
+  [P4] PASS
+       device_serial: emulator-5554
+       start_time_utc: 2026-09-22T15:20:21.971027+00:00
+       end_time_utc: 2026-09-22T15:20:26.113735+00:00
+  [P5] PASS
+       device_serial: emulator-5554
+       sys_boot_completed: 1
+       package_manager_responsive: True
+       boot_id: 083cb007-f81c-4651-81d4-8634679a777f
+       start_time_utc: 2026-09-22T15:20:26.113833+00:00
+       end_time_utc: 2026-09-22T15:20:47.700633+00:00
+  [P6] PASS
+       contract: ALVORADA_P6_FIXTURE_BUILD_V1
+       package_name: org.alvorada.reliability.harness
+       target_api: 36
+       apk_path: /home/runner/work/ALVORADA/ALVORADA/experiments/reliability-harness/artifacts/p1-p10/alvorada-harness.apk
+       apk_size_bytes: 12691
+       apk_sha256: 2d0caac70df115fccc3d6387ea748100e0e6ca29eb2807bdf39bb1c68fac4a80
+       start_time_utc: 2026-09-22T15:20:47.700689+00:00
+       end_time_utc: 2026-09-22T15:21:00.158407+00:00
+  [P7] PASS
+       package_name: org.alvorada.reliability.harness
+       installed_apk_path: /data/app/~~4YWI8IXrPCMsZoV3VEgDxQ==/org.alvorada.reliability.harness-G9Sb_6tvgE-dZg8fWd8dpQ==/base.apk
+       start_time_utc: 2026-09-22T15:21:00.158446+00:00
+       end_time_utc: 2026-09-22T15:21:00.438925+00:00
+  [P8] PASS
+       package_name: org.alvorada.reliability.harness
+       broadcast_action: org.alvorada.reliability.harness.PING
+       broadcast_response: result=42, data="ALVORADA_P8_PASS"
+       activity_component: org.alvorada.reliability.harness/.HarnessActivity
+       start_time_utc: 2026-09-22T15:21:00.438973+00:00
+       end_time_utc: 2026-09-22T15:21:00.689780+00:00
+  [P9] PASS
+       semantics: COLD_RESTART_WITHOUT_SNAPSHOT_OR_WIPE
+       boot_id_initial: 083cb007-f81c-4651-81d4-8634679a777f
+       boot_id_cold_restart: 7313b1d4-ab96-439b-b7bf-c1c808452765
+       boot_id_changed: True
+       package_persisted: True
+       start_time_utc: 2026-09-22T15:21:00.689824+00:00
+       end_time_utc: 2026-09-22T15:21:43.069724+00:00
+  [P10] PASS
+       semantics: CONTROLLED_GUEST_REBOOT
+       boot_id_initial: 083cb007-f81c-4651-81d4-8634679a777f
+       boot_id_cold_restart: 7313b1d4-ab96-439b-b7bf-c1c808452765
+       boot_id_guest_reboot: 508030e2-dd7a-4c00-bec6-63934b86cb7d
+       boot_id_changed: True
+       package_persisted: True
+       adb_recovered: True
+       start_time_utc: 2026-09-22T15:21:43.069775+00:00
+       end_time_utc: 2026-09-22T15:22:30.393131+00:00
+
+SCIENTIFIC VERDICT: PASS
+END OF REPORT

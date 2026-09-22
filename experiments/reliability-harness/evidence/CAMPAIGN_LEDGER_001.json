@@ -1,0 +1,19 @@
+{
+  "campaign": "ALVORADA_G1_POST_FOUNDER_APPROVAL_001",
+  "contract": "ALVORADA_CAMPAIGN_LEDGER_V1",
+  "historical_accounting": {
+    "ci_budget_planned": 2,
+    "ci_budget_authorized_extended": 6,
+    "ci_runs_actually_dispatched": 6,
+    "ci_runs_used": 6,
+    "ci_budget": 6,
+    "ci_budget_exhausted": "YES",
+    "accounting_integrity_note": "Previous campaign accounting recorded without revisionism; 6 runs were consumed."
+  },
+  "e1_proof_campaign_001": {
+    "status": "IN_PROGRESS",
+    "ci_budget": 6,
+    "ci_runs_dispatched": 0,
+    "max_external_ci_runs": 6
+  }
+}

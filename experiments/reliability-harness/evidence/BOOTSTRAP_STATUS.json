@@ -1,0 +1,20 @@
+{
+  "contract": "ALVORADA_G1_ANDROID_LAB_BOOTSTRAP_V1",
+  "status": "EMPIRICALLY_PROVEN_ON_E1_REFERENCE_RUNNER",
+  "provenance": {
+    "run_id": "35746460356",
+    "commit_sha": "4e28a3017b638f3861d83d5afcf973022ee049d8",
+    "lock_digest": "ac243a03caca0333eec85721cbd27f828a001c3b19ed80d7994e33589f065f05",
+    "selected_gpu": "swiftshader",
+    "platform_api": "android-36",
+    "emulator_revision": "37.1.11",
+    "gates_proven": ["P1", "P2", "P3", "P4", "P5", "P6", "P7", "P8", "P9", "P10"]
+  },
+  "epistemic_boundary": {
+    "is_multi_oem_proof": false,
+    "is_physical_device_proof": false,
+    "is_production_proof": false,
+    "is_universal_android_proof": false,
+    "scope": "E1_REFERENCE_RUNNER_ONLY"
+  }
+}

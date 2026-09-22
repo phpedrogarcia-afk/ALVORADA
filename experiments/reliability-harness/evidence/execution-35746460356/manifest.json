@@ -1,0 +1,11 @@
+{
+  "campaign": "ALVORADA_G1_POST_FOUNDER_APPROVAL_001",
+  "ci_run_id": "35746460356",
+  "contract": "ALVORADA_EXECUTION_EVIDENCE_MANIFEST_V1",
+  "lock_digest": "ac243a03caca0333eec85721cbd27f828a001c3b19ed80d7994e33589f065f05",
+  "overall_status": "PASS",
+  "p1_p10_status": "PASS",
+  "repository_commit_sha": "4e28a3017b638f3861d83d5afcf973022ee049d8",
+  "selected_gpu": "swiftshader",
+  "wave1_status": "PASS"
+}
