@@ -52,10 +52,14 @@ def resolve_sdk_root(override_path: Optional[str] = None) -> str:
     Checks explicit override, environment variables (ANDROID_SDK_ROOT, ANDROID_HOME),
     and common runner locations. Fails closed if not found.
     """
-    candidates = []
     if override_path:
-        candidates.append(override_path)
+        if os.path.isdir(override_path):
+            return os.path.abspath(override_path)
+        raise FileNotFoundError(
+            f"CANONICAL_SDK_ROOT_OVERRIDE_NOT_FOUND: {override_path}"
+        )
 
+    candidates = []
     env_sdk_root = os.environ.get("ANDROID_SDK_ROOT")
     if env_sdk_root:
         candidates.append(env_sdk_root)

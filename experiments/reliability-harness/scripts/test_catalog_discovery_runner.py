@@ -103,6 +103,14 @@ class TestCatalogDiscoveryRunner(unittest.TestCase):
         with self.assertRaises(FileNotFoundError):
             resolve_sdk_root(override_path=os.path.join(self.temp_dir, "nonexistent"))
 
+    def test_sdk_root_resolution_all_missing(self):
+        import unittest.mock
+        with unittest.mock.patch.dict(os.environ, {"ANDROID_SDK_ROOT": "", "ANDROID_HOME": ""}):
+            with unittest.mock.patch("os.path.isdir", return_value=False):
+                with unittest.mock.patch("shutil.which", return_value=None):
+                    with self.assertRaises(FileNotFoundError):
+                        resolve_sdk_root()
+
     def test_sdkmanager_resolution_override(self):
         fake_bin = os.path.join(self.temp_dir, "fake_sdkmanager")
         with open(fake_bin, "w") as f:
