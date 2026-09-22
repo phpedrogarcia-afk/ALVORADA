@@ -19,7 +19,7 @@ jobs:
   wave1-provision-and-audit:
     name: Provision locked Android environment and adversarial audit
     runs-on: ubuntu-24.04
-    timeout-minutes: 15
+    timeout-minutes: 25
     env:
       ALVORADA_REPOSITORY_VISIBILITY: ${{ github.event.repository.private && 'private' || 'public' }}
       ALVORADA_WORKFLOW_PERMISSIONS: contents:read
@@ -108,11 +108,60 @@ jobs:
           print('WAVE1_LOCKED_MATCH_VERIFIED=TRUE')
           "
 
-      - name: Upload Wave 1 provisioning artifacts
+      - name: Configure KVM acceleration and Android SDK PATH
+        shell: bash
+        run: |
+          if [ -e /dev/kvm ]; then
+            sudo chmod 666 /dev/kvm || true
+            ls -la /dev/kvm
+            echo "KVM_READY=TRUE"
+          else
+            echo "WARNING: /dev/kvm not found"
+          fi
+          echo "/usr/local/lib/android/sdk/cmdline-tools/latest/bin" >> $GITHUB_PATH
+          echo "/usr/local/lib/android/sdk/emulator" >> $GITHUB_PATH
+          echo "/usr/local/lib/android/sdk/platform-tools" >> $GITHUB_PATH
+
+      - name: Create Wave 2 API 36 AVD and verify P1
+        shell: bash
+        run: |
+          python3 experiments/reliability-harness/scripts/wave2_avd_manager.py --action create
+
+      - name: Execute P1 through P10 proof sequence
+        shell: bash
+        run: |
+          mkdir -p experiments/reliability-harness/artifacts/p1-p10
+          python3 experiments/reliability-harness/scripts/proof_runner.py \
+            --repo-sha "${{ github.sha }}" \
+            --run-id "${{ github.run_id }}" \
+            --output-dir experiments/reliability-harness/artifacts/p1-p10 \
+            --timeout-boot 300 \
+            --startup-window 20
+
+      - name: Verify P1-P10 checksums and assert complete pass
+        shell: bash
+        run: |
+          cd experiments/reliability-harness/artifacts/p1-p10
+          sha256sum -c checksums.sha256
+          python3 -c "
+          import json, sys
+          with open('proof-report.json') as f:
+              rep = json.load(f)
+          if rep.get('overall_status') != 'PASS':
+              print(f'ERROR: overall_status is {rep.get(\"overall_status\")}', file=sys.stderr)
+              sys.exit(1)
+          for g in ['P1','P2','P3','P4','P5','P6','P7','P8','P9','P10']:
+              if rep.get('gates', {}).get(g, {}).get('result') != 'PASS':
+                  print(f'ERROR: gate {g} did not pass!', file=sys.stderr)
+                  sys.exit(1)
+          print('ALL_P1_P10_GATES_VERIFIED_PASS=TRUE')
+          "
+
+      - name: Upload execution campaign artifacts
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: wave1-provision-${{ github.sha }}-${{ github.run_id }}
+          name: execution-campaign-${{ github.sha }}-${{ github.run_id }}
           path: experiments/reliability-harness/artifacts/
           if-no-files-found: error
-          retention-days: 1
+          retention-days: 7
