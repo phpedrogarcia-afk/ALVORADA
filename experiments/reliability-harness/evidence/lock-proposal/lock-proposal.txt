@@ -1,0 +1,61 @@
+ALVORADA LOCK PROPOSAL AUDIT REPORT
+==================================
+Contract: ALVORADA_LOCK_PROPOSAL_V2
+Proposal State: PENDING_HUMAN_REVIEW
+Ready for Human Review: YES
+
+CRYPTOGRAPHIC IDENTITIES & INTEGRITY DIGESTS
+-------------------------------------------
+Catalog Digest (CATALOG_DIGEST):             e9148d7bcdb5124182f87787a78899845aa9a60aefbe5c4bc581539201b4f6ed
+Bound Catalog Projection SHA-256:           64f3ddd82cc72dacc9146e492345d1f7db8196cff053d7343521021140a7404e
+Bound GPU Projection SHA-256:               dc4b6c15243217d1c04c6347b5a671910346d4753f603a4869b3723b09677b98
+GPU Evidence SHA-256:                        3367f81d8e0d89f48cc13d1d41a7191a1f4e2efb4f748ccfd1fb7de77baf29fe
+Lock Proposal Digest (LOCK_PROPOSAL_DIGEST): 5517290ec9b90cdcbc13ad34a1228a1ff422f2a5c2326d622e9f2ae249b411b4
+
+PROVENANCE & TRACEABILITY
+-------------------------
+Catalog Commit SHA:    e7f1601e04fc151a791d6cdf033cbdb679bd4060
+Catalog CI Run ID:     35734672486
+GPU Commit SHA:        e7f1601e04fc151a791d6cdf033cbdb679bd4060
+GPU CI Run ID:         35734871241
+Runner Image Label:    ubuntu24
+Runner Image Version:  20260907.300.1
+
+RUNNER ENVIRONMENT SPECIFICATION
+--------------------------------
+Operating System:       Linux
+JDK Major Version:      17
+Cmdline-tools Revision: 12.0
+Emulator Revision:      37.1.11
+
+FRESHNESS SPECIFICATION
+-----------------------
+Observed At UTC: 2026-09-22T13:39:23Z
+Fresh Until UTC: 2026-09-29T13:39:23Z
+Max Age Days:    7
+
+HARD LOCK PACKAGES (5)
+----------------------
+1. build-tools;36.0.0 -> 36.0.0
+2. emulator -> 37.1.11
+3. platform-tools -> 37.0.1
+4. platforms;android-36 -> 2
+5. system-images;android-36;default;x86_64 -> 2
+
+EPHEMERAL GPU CAPABILITY EVIDENCE
+---------------------------------
+Overall Status:        PASS_STRICT
+Parser Status:         PASS_STRICT
+Evidence Ready:        YES
+Emulator Revision:     37.1.11
+Candidate Mode Count:  6
+Candidate Modes:       auto, host, lavapipe, software, swangle, swiftshader
+
+DECISION BOUNDARY NOTICE:
+-------------------------
+THIS ARTIFACT REPRESENTS A PENDING PROPOSAL FOR HUMAN REVIEW.
+NO GPU MODE HAS BEEN SELECTED.
+NO LOCK HAS BEEN APPROVED.
+HUMAN AUTHORITY IS REQUIRED TO SELECT A GPU CANDIDATE AND PRODUCE AN APPROVED LOCK.
+
+END OF LOCK PROPOSAL REPORT

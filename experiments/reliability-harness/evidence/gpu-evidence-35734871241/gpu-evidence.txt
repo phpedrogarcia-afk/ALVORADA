@@ -1,0 +1,40 @@
+ALVORADA GPU CAPABILITY EVIDENCE REPORT
+=======================================
+Contract: ALVORADA_GPU_EVIDENCE_V1 (Embedded in ALVORADA_LOCK_PROPOSAL_V1)
+Repository Commit SHA: e7f1601e04fc151a791d6cdf033cbdb679bd4060
+CI Run ID: 35734871241
+Observation Timestamp UTC: 2026-09-22T13:39:23Z
+
+RUNNER ENVIRONMENT TELEMETRY
+----------------------------
+Runner OS: Linux
+Runner Image Label: ubuntu24
+Runner Image Version: 20260907.300.1
+Host Platform: Linux-6.17.0-1022-azure-x86_64-with-glibc2.39
+Host Machine: x86_64
+Libpulse Available: YES
+Canonical SDK Root: /usr/local/lib/android/sdk
+Emulator Binary Location: /usr/local/lib/android/sdk/emulator/emulator
+Emulator Candidate Revision: 37.1.11
+Policy Invocation Checks: verify_emulator_invocation = PASS
+Help Interface Proved GPU: YES
+
+GPU CAPABILITY OBSERVATION SUMMARY
+----------------------------------
+Overall Status: PASS_STRICT
+Parser Status: PASS_STRICT
+Evidence Ready: YES
+Bound Catalog Projection SHA-256: dc4b6c15243217d1c04c6347b5a671910346d4753f603a4869b3723b09677b98
+GPU Evidence SHA-256: 3367f81d8e0d89f48cc13d1d41a7191a1f4e2efb4f748ccfd1fb7de77baf29fe
+Candidate Mode Count: 6
+
+CANDIDATE GPU MODES DISCOVERED:
+------------------------------
+1. auto
+2. host
+3. lavapipe
+4. software
+5. swangle
+6. swiftshader
+
+END OF GPU EVIDENCE REPORT

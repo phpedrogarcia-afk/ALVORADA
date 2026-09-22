@@ -1,0 +1,52 @@
+ALVORADA CATALOG DISCOVERY EVIDENCE REPORT
+==========================================
+Contract: ALVORADA_CATALOG_PROJECTION_V1
+Repository Commit SHA: e7f1601e04fc151a791d6cdf033cbdb679bd4060
+Catalog Run ID: 35734672486
+Observation Timestamp UTC: 2026-09-22T13:37:32Z
+
+RUNNER ENVIRONMENT TELEMETRY
+----------------------------
+Runner OS: Linux
+Runner Image Label: ubuntu24
+Runner Image Version: 20260907.300.1
+Host Platform: Linux-6.17.0-1022-azure-x86_64-with-glibc2.39
+Host Machine: x86_64
+Java / JDK Version: openjdk version "17.0.20.1" 2026-08-18
+JDK Major: 17
+Canonical SDK Root: /usr/local/lib/android/sdk
+SDK Manager Location: /usr/local/lib/android/sdk/cmdline-tools/latest/bin/sdkmanager
+Cmdline-tools Revision: 12.0
+Policy Check: CatalogReadOnlyPolicy.verify_sdkmanager_invocation = PASS
+
+CATALOG PROJECTION SUMMARY
+--------------------------
+Is Complete: YES
+Has Ambiguity: NO
+Projection SHA-256: 64f3ddd82cc72dacc9146e492345d1f7db8196cff053d7343521021140a7404e
+Catalog Digest: e9148d7bcdb5124182f87787a78899845aa9a60aefbe5c4bc581539201b4f6ed
+
+HARD LOCK PACKAGES (5):
+-----------------------
+1. Package: build-tools;36.0.0
+   State: PRESENT_MATCHING_CATALOG
+   Catalog Revision: 36.0.0
+   Installed Revision: 36.0.0
+2. Package: emulator
+   State: ABSENT
+   Catalog Revision: 37.1.11
+   Installed Revision: None
+3. Package: platform-tools
+   State: PRESENT_MATCHING_CATALOG
+   Catalog Revision: 37.0.1
+   Installed Revision: 37.0.1
+4. Package: platforms;android-36
+   State: PRESENT_MATCHING_CATALOG
+   Catalog Revision: 2
+   Installed Revision: 2
+5. Package: system-images;android-36;default;x86_64
+   State: ABSENT
+   Catalog Revision: 2
+   Installed Revision: None
+
+END OF EVIDENCE REPORT
