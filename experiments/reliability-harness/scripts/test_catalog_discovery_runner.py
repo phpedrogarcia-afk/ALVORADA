@@ -204,10 +204,7 @@ class TestCatalogDiscoveryRunner(unittest.TestCase):
         # Verify checksums match files
         with open(proj_file, "rb") as f:
             proj_data = f.read()
-            # Must end with \n for posix standard
-            self.assertTrue(proj_data.endswith(b"\n"))
-            canon_bytes = proj_data[:-1]
-            actual_proj_sha = hashlib.sha256(canon_bytes).hexdigest()
+            actual_proj_sha = hashlib.sha256(proj_data).hexdigest()
             self.assertEqual(actual_proj_sha, digests["projection_sha256"])
 
         with open(evid_file, "rb") as f:

@@ -403,7 +403,6 @@ def run_catalog_discovery(
     projection_file = os.path.join(output_dir, "catalog-projection.json")
     with open(projection_file, "wb") as f:
         f.write(canon_bytes)
-        f.write(b"\n")
 
     # 6. Write catalog-evidence.txt
     evidence_text = generate_catalog_evidence_text(
