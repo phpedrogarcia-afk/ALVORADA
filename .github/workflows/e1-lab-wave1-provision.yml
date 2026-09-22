@@ -108,15 +108,32 @@ jobs:
           print('WAVE1_LOCKED_MATCH_VERIFIED=TRUE')
           "
 
-      - name: Configure KVM acceleration and Android SDK PATH
+      - name: Configure bounded KVM acceleration and Android SDK PATH
         shell: bash
         run: |
-          if [ -e /dev/kvm ]; then
-            sudo chmod 666 /dev/kvm || true
-            ls -la /dev/kvm
+          echo "=== PRE-KVM VERIFICATION ==="
+          if [ ! -e /dev/kvm ]; then
+            echo "ERROR: /dev/kvm not found. Hardware acceleration unavailable." >&2
+            exit 1
+          fi
+          ls -la /dev/kvm
+
+          echo "=== APPLYING BOUNDED KVM ACCESS ==="
+          if command -v setfacl >/dev/null 2>&1; then
+            sudo setfacl -m u:$USER:rw /dev/kvm || true
+          fi
+          if [ ! -r /dev/kvm ] || [ ! -w /dev/kvm ]; then
+            sudo usermod -aG kvm $USER || true
+            sudo chown $USER /dev/kvm || sudo chmod 660 /dev/kvm
+          fi
+
+          echo "=== POST-KVM VERIFICATION (FAIL-CLOSED) ==="
+          ls -la /dev/kvm
+          if [ -r /dev/kvm ] && [ -w /dev/kvm ]; then
             echo "KVM_READY=TRUE"
           else
-            echo "WARNING: /dev/kvm not found"
+            echo "ERROR: Runner user $USER does not have read/write access to /dev/kvm" >&2
+            exit 1
           fi
           echo "/usr/local/lib/android/sdk/cmdline-tools/latest/bin" >> $GITHUB_PATH
           echo "/usr/local/lib/android/sdk/emulator" >> $GITHUB_PATH
@@ -127,34 +144,54 @@ jobs:
         run: |
           python3 experiments/reliability-harness/scripts/wave2_avd_manager.py --action create
 
-      - name: Execute P1 through P10 proof sequence
+      - name: Build Wake Core reliability test APK
         shell: bash
         run: |
-          mkdir -p experiments/reliability-harness/artifacts/p1-p10
-          python3 experiments/reliability-harness/scripts/proof_runner.py \
+          mkdir -p experiments/reliability-harness/build/wakecore
+          python3 experiments/reliability-harness/scripts/wakecore_builder.py \
+            --build-dir experiments/reliability-harness/build/wakecore \
+            --output-apk experiments/reliability-harness/build/wakecore/alvorada-wakecore.apk
+
+      - name: Execute E1 Reliability Scenarios (A1-A6, B1-B3, Fault Recovery)
+        shell: bash
+        run: |
+          mkdir -p experiments/reliability-harness/artifacts/e1-scenarios
+          python3 experiments/reliability-harness/scripts/e1_scenario_runner.py \
+            --start-emulator \
+            --install-apk experiments/reliability-harness/build/wakecore/alvorada-wakecore.apk \
             --repo-sha "${{ github.sha }}" \
             --run-id "${{ github.run_id }}" \
-            --output-dir experiments/reliability-harness/artifacts/p1-p10 \
-            --timeout-boot 300 \
-            --startup-window 20
+            --output-dir experiments/reliability-harness/artifacts/e1-scenarios \
+            --timeout-boot 300
 
-      - name: Verify P1-P10 checksums and assert complete pass
+      - name: Verify E1 scenario checksums and assert complete pass
         shell: bash
         run: |
-          cd experiments/reliability-harness/artifacts/p1-p10
+          cd experiments/reliability-harness/artifacts/e1-scenarios
           sha256sum -c checksums.sha256
           python3 -c "
           import json, sys
-          with open('proof-report.json') as f:
+          with open('e1-scenario-report.json') as f:
               rep = json.load(f)
           if rep.get('overall_status') != 'PASS':
               print(f'ERROR: overall_status is {rep.get(\"overall_status\")}', file=sys.stderr)
               sys.exit(1)
-          for g in ['P1','P2','P3','P4','P5','P6','P7','P8','P9','P10']:
-              if rep.get('gates', {}).get(g, {}).get('result') != 'PASS':
-                  print(f'ERROR: gate {g} did not pass!', file=sys.stderr)
+          scenarios = rep.get('scenarios', {})
+          required = [
+              'A1_BASELINE', 'A2_PROCESS_DEATH', 'A3_DUPLICATE_DEFENSE',
+              'A4_STALE_GENERATION', 'A5_SNOOZE', 'A6_DISMISS',
+              'B1_GUEST_REBOOT', 'B2_RECONCILIATION_IDEMPOTENCE', 'B3_LATE_RECOVERY',
+              'PHASE_11_FORCE_STOP', 'PHASE_12_READINESS_DECAY'
+          ]
+          for s in required:
+              if s not in scenarios or scenarios[s].get('result') != 'PASS':
+                  print(f'ERROR: scenario {s} did not pass: {scenarios.get(s)}', file=sys.stderr)
                   sys.exit(1)
-          print('ALL_P1_P10_GATES_VERIFIED_PASS=TRUE')
+          stats = rep.get('statistical_summary', {})
+          if stats.get('duplicate_triggers_accepted', -1) != 0:
+              print(f'ERROR: duplicate triggers accepted != 0: {stats.get(\"duplicate_triggers_accepted\")}', file=sys.stderr)
+              sys.exit(1)
+          print('ALL_E1_RELIABILITY_SCENARIOS_VERIFIED_PASS=TRUE')
           "
 
       - name: Upload execution campaign artifacts

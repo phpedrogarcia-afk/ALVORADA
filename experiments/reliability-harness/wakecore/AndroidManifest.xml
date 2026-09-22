@@ -1,0 +1,57 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    package="org.alvorada.reliability.wakecore"
+    android:versionCode="1"
+    android:versionName="1.0">
+
+    <uses-sdk
+        android:minSdkVersion="31"
+        android:targetSdkVersion="36" />
+
+    <!-- Exact alarm scheduling permissions -->
+    <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />
+    <uses-permission android:name="android.permission.USE_EXACT_ALARM" />
+
+    <!-- Boot completed and wakelock permissions -->
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+    <uses-permission android:name="android.permission.WAKE_LOCK" />
+
+    <application
+        android:label="AlvoradaWakeCore"
+        android:hasCode="true"
+        android:directBootAware="true">
+
+        <!-- Alarm trigger receiver (called by AlarmManager) -->
+        <receiver
+            android:name=".WakeAlarmReceiver"
+            android:exported="true"
+            android:directBootAware="true">
+            <intent-filter>
+                <action android:name="org.alvorada.reliability.wakecore.ALARM_TRIGGER" />
+            </intent-filter>
+        </receiver>
+
+        <!-- Boot receiver (called upon guest reboot / Direct Boot) -->
+        <receiver
+            android:name=".WakeBootReceiver"
+            android:exported="true"
+            android:directBootAware="true">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+                <action android:name="android.intent.action.LOCKED_BOOT_COMPLETED" />
+            </intent-filter>
+        </receiver>
+
+        <!-- Test control and observation receiver (dispatched by e1_scenario_runner) -->
+        <receiver
+            android:name=".WakeControlReceiver"
+            android:exported="true"
+            android:directBootAware="true">
+            <intent-filter>
+                <action android:name="org.alvorada.reliability.wakecore.COMMAND" />
+            </intent-filter>
+        </receiver>
+
+    </application>
+
+</manifest>
