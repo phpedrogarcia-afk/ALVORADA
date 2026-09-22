@@ -24,11 +24,17 @@ import os
 import sys
 import unittest
 
+from catalog_core import hash_canonical_json_v1
+
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 from catalog_lock_model import (
     CONTRACT_CATALOG_DIGEST_PAYLOAD,
     CONTRACT_LOCK_PROPOSAL,
+    CONTRACT_LOCK_PROPOSAL_V2,
+    CONTRACT_GPU_PROJECTION,
+    CONTRACT_GPU_PROVENANCE,
+    CONTRACT_CATALOG_PROVENANCE,
     CONTRACT_HUMAN_DECISION,
     CONTRACT_LOCK_PAYLOAD,
     PROPOSAL_STATE_PENDING,
@@ -36,10 +42,20 @@ from catalog_lock_model import (
     create_catalog_digest_payload,
     compute_catalog_digest,
     validate_lock_proposal,
+    validate_lock_proposal_v2,
     create_lock_proposal,
+    create_lock_proposal_v2,
     compute_lock_proposal_digest,
     verify_human_decision,
     compute_lock_candidate,
+    validate_gpu_projection,
+    create_gpu_projection,
+    compute_gpu_projection_sha256,
+    validate_catalog_provenance,
+    create_catalog_provenance,
+    validate_gpu_provenance,
+    create_gpu_provenance,
+    build_lock_proposal_v2_from_provenance,
 )
 
 
@@ -1020,5 +1036,351 @@ class TestMutationMatrix(unittest.TestCase):
         self.assertIn("catalog_digest", str(ctx.exception))
 
 
+class TestV2ContractsAndCrossRunProvenance(unittest.TestCase):
+    """
+    Validates ALVORADA_LOCK_PROPOSAL_V2, ALVORADA_GPU_PROJECTION_V1,
+    ALVORADA_CATALOG_PROVENANCE_V1, ALVORADA_GPU_PROVENANCE_V1, and
+    build_lock_proposal_v2_from_provenance cross-run binding and adversarial safety.
+    """
+
+    def setUp(self):
+        self.cat_payload = {
+            "channel": 0,
+            "contract": CONTRACT_CATALOG_DIGEST_PAYLOAD,
+            "packages": [
+                {"catalog_revision": "36.0.0", "package_path": "build-tools;36.0.0"},
+                {"catalog_revision": "37.1.11", "package_path": "emulator"},
+                {"catalog_revision": "36.0.0", "package_path": "platform-tools"},
+                {"catalog_revision": "1", "package_path": "platforms;android-36"},
+                {"catalog_revision": "2", "package_path": "system-images;android-36;default;x86_64"},
+            ],
+        }
+        self.cat_proj = {
+            "contract": "ALVORADA_CATALOG_PROJECTION_V1",
+            "has_ambiguity": False,
+            "is_complete": True,
+            "packages": [
+                {"catalog_revision": p["catalog_revision"], "installed_revision": p["catalog_revision"], "package_path": p["package_path"], "state": "PRESENT_MATCHING_CATALOG"}
+                for p in self.cat_payload["packages"]
+            ],
+        }
+        self.cat_digest = compute_catalog_digest(self.cat_proj)[0]
+        self.cat_proj_sha = hash_canonical_json_v1(self.cat_proj)
+
+        self.cat_prov = create_catalog_provenance(
+            repository_commit_sha="43018b1f9b14cb9e580d2157e6cb623ee18de0d1",
+            run_id="35540374123",
+            observed_at="2026-09-22T08:00:00Z",
+            runner_os="Linux",
+            runner_image_label="ubuntu24",
+            runner_image_version="20260907.300.1",
+            jdk_major=17,
+            cmdline_tools_revision="19.0",
+            catalog_projection_sha256=self.cat_proj_sha,
+            catalog_digest=self.cat_digest,
+        )
+
+        self.candidates = ["auto", "host", "lavapipe", "software", "swangle", "swiftshader"]
+        self.gpu_proj = create_gpu_projection("37.1.11", self.candidates)
+        self.gpu_proj_sha = compute_gpu_projection_sha256(self.gpu_proj)
+
+        self.gpu_prov = {
+            "contract": CONTRACT_GPU_PROVENANCE,
+            "emulator_revision": "37.1.11",
+            "gpu_projection_sha256": self.gpu_proj_sha,
+            "observed_at": "2026-09-22T09:30:00Z",
+            "repository_commit_sha": "a75623749b998b2affd2834cc5ce31c9fda3e4b2",
+            "run_id": "35729959417",
+            "runner_image_label": "ubuntu24",
+            "runner_image_version": "20260907.300.1",
+            "runner_os": "Linux",
+        }
+
+        self.gpu_ev = {
+            "candidate_modes": self.candidates,
+            "emulator_revision": "37.1.11",
+            "evidence_ready": True,
+            "parser_status": "PASS_STRICT",
+            "projection_sha256": self.gpu_proj_sha,
+            "status": "PASS_STRICT",
+        }
+
+    def test_gpu_projection_contract_and_sha256(self):
+        """GPU projection is deterministic, validated, and rejects invalid structures."""
+        proj = create_gpu_projection("37.1.11", ["swiftshader", "auto"])
+        self.assertEqual(proj["contract"], CONTRACT_GPU_PROJECTION)
+        self.assertEqual(proj["emulator_revision"], "37.1.11")
+        self.assertEqual(proj["candidate_modes"], ["auto", "swiftshader"])
+
+        sha = compute_gpu_projection_sha256(proj)
+        self.assertEqual(len(sha), 64)
+
+        # Fails closed on invalid candidate modes
+        with self.assertRaises(ValueError):
+            validate_gpu_projection({"contract": CONTRACT_GPU_PROJECTION, "emulator_revision": "37.1.11", "candidate_modes": "auto"})
+        with self.assertRaises(ValueError):
+            validate_gpu_projection({"contract": CONTRACT_GPU_PROJECTION, "emulator_revision": "37.1.11", "candidate_modes": []})
+        with self.assertRaises(ValueError):
+            validate_gpu_projection({"contract": CONTRACT_GPU_PROJECTION, "emulator_revision": "", "candidate_modes": ["auto"]})
+        with self.assertRaises(ValueError):
+            validate_gpu_projection({"contract": "WRONG_CONTRACT", "emulator_revision": "37.1.11", "candidate_modes": ["auto"]})
+
+    def test_catalog_provenance_validation(self):
+        """Catalog provenance validates all fields and rejects invalid hashes, run IDs, and timestamps."""
+        validate_catalog_provenance(self.cat_prov)
+
+        # Non-hex or invalid length commit SHA
+        prov = copy.deepcopy(self.cat_prov)
+        prov["repository_commit_sha"] = "43018b1f9b14cb9e580d2157e6cb623ee18de0d"  # 39 chars
+        with self.assertRaises(ValueError):
+            validate_catalog_provenance(prov)
+
+        # Non-decimal or negative run ID
+        prov = copy.deepcopy(self.cat_prov)
+        prov["run_id"] = "-35540374123"
+        with self.assertRaises(ValueError):
+            validate_catalog_provenance(prov)
+
+        # Invalid catalog digest format
+        prov = copy.deepcopy(self.cat_prov)
+        prov["catalog_digest"] = "NOT_A_HEX_STRING"
+        with self.assertRaises(ValueError):
+            validate_catalog_provenance(prov)
+
+        # Extra keys rejected
+        prov = copy.deepcopy(self.cat_prov)
+        prov["extra_key"] = "leak"
+        with self.assertRaises(ValueError):
+            validate_catalog_provenance(prov)
+
+    def test_gpu_provenance_validation(self):
+        """GPU provenance validates all fields and rejects invalid hashes, run IDs, and missing keys."""
+        validate_gpu_provenance(self.gpu_prov)
+
+        prov = copy.deepcopy(self.gpu_prov)
+        prov["gpu_projection_sha256"] = "60c5a10abe62cbbba40f81967647a67f98b0357b5c6e41c422c331a2d810346"  # 63 chars
+        with self.assertRaises(ValueError):
+            validate_gpu_provenance(prov)
+
+        prov = copy.deepcopy(self.gpu_prov)
+        prov["emulator_revision"] = "   "
+        with self.assertRaises(ValueError):
+            validate_gpu_provenance(prov)
+
+    def test_lock_proposal_v2_lifecycle(self):
+        """V2 Proposal creation, structural validation, and dispatch."""
+        env = {
+            "cmdline_tools_revision": "19.0",
+            "emulator_revision": "37.1.11",
+            "jdk_major": 17,
+            "runner_image_label": "ubuntu24",
+            "runner_image_version": "20260907.300.1",
+            "runner_os": "Linux",
+        }
+        prov = {
+            "catalog_commit_sha": "43018b1f9b14cb9e580d2157e6cb623ee18de0d1",
+            "catalog_run_id": "35540374123",
+            "gpu_commit_sha": "a75623749b998b2affd2834cc5ce31c9fda3e4b2",
+            "gpu_run_id": "35729959417",
+            "runner_image_label": "ubuntu24",
+            "runner_image_version": "20260907.300.1",
+        }
+        freshness = {
+            "fresh_until": "2026-09-29T09:30:00Z",
+            "max_age_days": 7,
+            "observed_at": "2026-09-22T09:30:00Z",
+        }
+        proposal = create_lock_proposal_v2(
+            catalog_digest_payload=self.cat_payload,
+            environment=env,
+            gpu_evidence=self.gpu_ev,
+            freshness=freshness,
+            provenance=prov,
+        )
+        self.assertEqual(proposal["contract"], CONTRACT_LOCK_PROPOSAL_V2)
+        self.assertTrue(proposal["ready_for_human_review"])
+        self.assertEqual(proposal["proposal_state"], PROPOSAL_STATE_PENDING)
+
+        # Dispatch via validate_lock_proposal works
+        validate_lock_proposal(proposal)
+
+        # Digest computation works
+        digest = compute_lock_proposal_digest(proposal)
+        self.assertEqual(len(digest), 64)
+
+    def test_build_lock_proposal_v2_from_provenance_happy_path(self):
+        """build_lock_proposal_v2_from_provenance enforces causal freshness and builds valid V2 proposal."""
+        proposal = build_lock_proposal_v2_from_provenance(
+            catalog_digest_payload=self.cat_payload,
+            catalog_provenance=self.cat_prov,
+            gpu_evidence=self.gpu_ev,
+            gpu_provenance=self.gpu_prov,
+            gpu_projection=self.gpu_proj,
+        )
+
+        self.assertEqual(proposal["contract"], CONTRACT_LOCK_PROPOSAL_V2)
+        # Causal freshness: cat_obs = 08:00:00Z, gpu_obs = 09:30:00Z -> max is 09:30:00Z
+        self.assertEqual(proposal["freshness"]["observed_at"], "2026-09-22T09:30:00Z")
+        self.assertEqual(proposal["freshness"]["fresh_until"], "2026-09-29T09:30:00Z")
+        self.assertEqual(proposal["provenance"]["catalog_run_id"], "35540374123")
+        self.assertEqual(proposal["provenance"]["gpu_run_id"], "35729959417")
+        self.assertEqual(proposal["provenance"]["catalog_commit_sha"], "43018b1f9b14cb9e580d2157e6cb623ee18de0d1")
+        self.assertEqual(proposal["provenance"]["gpu_commit_sha"], "a75623749b998b2affd2834cc5ce31c9fda3e4b2")
+        self.assertTrue(proposal["ready_for_human_review"])
+
+    def test_build_lock_proposal_v2_fails_on_catalog_digest_mismatch(self):
+        """Fails closed if catalog_provenance has mismatched catalog_digest."""
+        bad_prov = copy.deepcopy(self.cat_prov)
+        bad_prov["catalog_digest"] = "0000000000000000000000000000000000000000000000000000000000000000"
+        with self.assertRaises(ValueError) as ctx:
+            build_lock_proposal_v2_from_provenance(
+                catalog_digest_payload=self.cat_payload,
+                catalog_provenance=bad_prov,
+                gpu_evidence=self.gpu_ev,
+                gpu_provenance=self.gpu_prov,
+                gpu_projection=self.gpu_proj,
+            )
+        self.assertIn("CATALOG_DIGEST_MISMATCH", str(ctx.exception))
+
+    def test_build_lock_proposal_v2_fails_on_gpu_projection_sha_mismatch(self):
+        """Fails closed if gpu_provenance or gpu_evidence has mismatched projection SHA."""
+        bad_prov = copy.deepcopy(self.gpu_prov)
+        bad_prov["gpu_projection_sha256"] = "1111111111111111111111111111111111111111111111111111111111111111"
+        with self.assertRaises(ValueError) as ctx:
+            build_lock_proposal_v2_from_provenance(
+                catalog_digest_payload=self.cat_payload,
+                catalog_provenance=self.cat_prov,
+                gpu_evidence=self.gpu_ev,
+                gpu_provenance=bad_prov,
+                gpu_projection=self.gpu_proj,
+            )
+        self.assertIn("GPU_PROJECTION_SHA_MISMATCH", str(ctx.exception))
+
+        bad_ev = copy.deepcopy(self.gpu_ev)
+        bad_ev["projection_sha256"] = "2222222222222222222222222222222222222222222222222222222222222222"
+        with self.assertRaises(ValueError) as ctx:
+            build_lock_proposal_v2_from_provenance(
+                catalog_digest_payload=self.cat_payload,
+                catalog_provenance=self.cat_prov,
+                gpu_evidence=bad_ev,
+                gpu_provenance=self.gpu_prov,
+                gpu_projection=self.gpu_proj,
+            )
+        self.assertIn("GPU_EVIDENCE_PROJECTION_MISMATCH", str(ctx.exception))
+
+    def test_build_lock_proposal_v2_fails_on_candidate_modes_mismatch(self):
+        """Fails closed if gpu_evidence candidate_modes does not match gpu_projection candidate_modes."""
+        bad_ev = copy.deepcopy(self.gpu_ev)
+        bad_ev["candidate_modes"] = ["auto", "host", "lavapipe", "nvidia-cuda", "software", "swangle", "swiftshader"]
+        with self.assertRaises(ValueError) as ctx:
+            build_lock_proposal_v2_from_provenance(
+                catalog_digest_payload=self.cat_payload,
+                catalog_provenance=self.cat_prov,
+                gpu_evidence=bad_ev,
+                gpu_provenance=self.gpu_prov,
+                gpu_projection=self.gpu_proj,
+            )
+        self.assertIn("GPU_CANDIDATE_MODES_MISMATCH", str(ctx.exception))
+
+    def test_build_lock_proposal_v2_fails_on_cross_run_runner_mismatch(self):
+        """Fails closed if catalog run and GPU run executed on different runner labels or versions."""
+        bad_prov = copy.deepcopy(self.gpu_prov)
+        bad_prov["runner_image_label"] = "ubuntu22"
+        with self.assertRaises(ValueError) as ctx:
+            build_lock_proposal_v2_from_provenance(
+                catalog_digest_payload=self.cat_payload,
+                catalog_provenance=self.cat_prov,
+                gpu_evidence=self.gpu_ev,
+                gpu_provenance=bad_prov,
+                gpu_projection=self.gpu_proj,
+            )
+        self.assertIn("CROSS_RUN_RUNNER_LABEL_MISMATCH", str(ctx.exception))
+
+        bad_prov = copy.deepcopy(self.gpu_prov)
+        bad_prov["runner_image_version"] = "20260901.100.0"
+        with self.assertRaises(ValueError) as ctx:
+            build_lock_proposal_v2_from_provenance(
+                catalog_digest_payload=self.cat_payload,
+                catalog_provenance=self.cat_prov,
+                gpu_evidence=self.gpu_ev,
+                gpu_provenance=bad_prov,
+                gpu_projection=self.gpu_proj,
+            )
+        self.assertIn("CROSS_RUN_RUNNER_VERSION_MISMATCH", str(ctx.exception))
+
+    def test_build_lock_proposal_v2_fails_on_tripartite_emulator_mismatch(self):
+        """Fails closed if catalog emulator revision != GPU provenance emulator != GPU projection emulator."""
+        # Case 1: GPU provenance emulator mismatch
+        bad_prov = copy.deepcopy(self.gpu_prov)
+        bad_prov["emulator_revision"] = "37.1.12"
+        with self.assertRaises(ValueError) as ctx:
+            build_lock_proposal_v2_from_provenance(
+                catalog_digest_payload=self.cat_payload,
+                catalog_provenance=self.cat_prov,
+                gpu_evidence=self.gpu_ev,
+                gpu_provenance=bad_prov,
+                gpu_projection=self.gpu_proj,
+            )
+        self.assertIn("EMULATOR_REVISION_MISMATCH", str(ctx.exception))
+
+        # Case 2: GPU side internally consistent on 37.1.12 but mismatches catalog hard lock 37.1.11
+        bad_proj = create_gpu_projection("37.1.12", self.candidates)
+        bad_proj_sha = compute_gpu_projection_sha256(bad_proj)
+        bad_prov2 = copy.deepcopy(self.gpu_prov)
+        bad_prov2["emulator_revision"] = "37.1.12"
+        bad_prov2["gpu_projection_sha256"] = bad_proj_sha
+        bad_ev = copy.deepcopy(self.gpu_ev)
+        bad_ev["emulator_revision"] = "37.1.12"
+        bad_ev["projection_sha256"] = bad_proj_sha
+
+        with self.assertRaises(ValueError) as ctx:
+            build_lock_proposal_v2_from_provenance(
+                catalog_digest_payload=self.cat_payload,
+                catalog_provenance=self.cat_prov,
+                gpu_evidence=bad_ev,
+                gpu_provenance=bad_prov2,
+                gpu_projection=bad_proj,
+            )
+        self.assertIn("EMULATOR_REVISION_MISMATCH", str(ctx.exception))
+
+    def test_compute_lock_candidate_with_v2_proposal(self):
+        """End-to-end: compute_lock_candidate works seamlessly with ALVORADA_LOCK_PROPOSAL_V2."""
+        proposal = build_lock_proposal_v2_from_provenance(
+            catalog_digest_payload=self.cat_payload,
+            catalog_provenance=self.cat_prov,
+            gpu_evidence=self.gpu_ev,
+            gpu_provenance=self.gpu_prov,
+            gpu_projection=self.gpu_proj,
+        )
+        prop_digest = compute_lock_proposal_digest(proposal)
+
+        decision = {
+            "catalog_digest": self.cat_digest,
+            "contract": CONTRACT_HUMAN_DECISION,
+            "decision": "APPROVE",
+            "proposal_digest": prop_digest,
+            "review_context": {"authority_basis": "FOUNDER_VERIFICATION_PASS"},
+            "reviewed_at": "2026-09-22T10:00:00Z",
+            "selected_gpu": "swiftshader",
+        }
+        eval_time = "2026-09-22T10:05:00Z"
+
+        is_valid, lock_digest, lock_payload, errors = compute_lock_candidate(
+            proposal=proposal,
+            human_decision=decision,
+            evaluation_time_utc=eval_time,
+        )
+        self.assertTrue(is_valid, f"Failed: {errors}")
+        self.assertIsNotNone(lock_digest)
+        self.assertEqual(lock_payload["selected_gpu"], "swiftshader")
+        self.assertEqual(lock_payload["contract"], CONTRACT_LOCK_PAYLOAD)
+
+        # 3 distinct cryptographic identities
+        self.assertNotEqual(self.cat_digest, prop_digest)
+        self.assertNotEqual(prop_digest, lock_digest)
+        self.assertNotEqual(self.cat_digest, lock_digest)
+
+
 if __name__ == "__main__":
     unittest.main()
+

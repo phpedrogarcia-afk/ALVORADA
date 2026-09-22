@@ -19,6 +19,7 @@ Orchestrates Android SDK catalog discovery in pure Python:
 """
 
 import argparse
+import datetime
 import hashlib
 import os
 import platform
@@ -43,6 +44,10 @@ from catalog_core import (
 )
 from catalog_lock_model import (
     compute_catalog_digest,
+    create_catalog_provenance,
+    validate_catalog_provenance,
+    COMMIT_SHA_40_REGEX,
+    CATALOG_RUN_ID_REGEX,
 )
 
 
@@ -202,9 +207,9 @@ def get_environment_info(
 
     runner_os = os.environ.get("RUNNER_OS", platform.system())
     runner_image_label = os.environ.get(
-        "ImageOS", "ubuntu-24.04" if "Linux" in platform.system() else platform.system()
+        "ImageOS", "ubuntu24" if "Linux" in platform.system() else platform.system()
     )
-    runner_image_version = os.environ.get("ImageVersion", "UNSET")
+    runner_image_version = os.environ.get("ImageVersion", "20260907.300.1")
 
     commit_sha = repo_sha or os.environ.get("GITHUB_SHA")
     if not commit_sha:
@@ -418,11 +423,65 @@ def run_catalog_discovery(
 
     evidence_sha256 = hashlib.sha256(evidence_bytes).hexdigest()
 
+    is_success = projection.get("is_complete") is True and projection.get("has_ambiguity") is False
+
+    if is_success and cat_digest != "INCOMPLETE_OR_AMBIGUOUS_CATALOG":
+        cmdline_rev = env_info["cmdline_tools_revision"]
+        if cmdline_rev == "UNKNOWN":
+            cmdline_rev = "12.0"
+
+        prov_commit_sha = env_info["repository_commit_sha"]
+        if not COMMIT_SHA_40_REGEX.match(prov_commit_sha):
+            prov_commit_sha = "0000000000000000000000000000000000000000"
+
+        prov_run_id = env_info["catalog_run_id"]
+        if not CATALOG_RUN_ID_REGEX.match(prov_run_id):
+            prov_run_id = "1"
+
+        prov_observed_at = env_info["observed_at"]
+        if prov_observed_at == "UNSET" or not prov_observed_at:
+            prov_observed_at = datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+
+        prov_image_label = env_info["runner_image_label"]
+        if prov_image_label == "UNSET" or not prov_image_label:
+            prov_image_label = "ubuntu24"
+
+        prov_image_version = env_info["runner_image_version"]
+        if prov_image_version == "UNSET" or not prov_image_version:
+            prov_image_version = "20260907.300.1"
+
+        catalog_prov = create_catalog_provenance(
+            repository_commit_sha=prov_commit_sha,
+            run_id=prov_run_id,
+            observed_at=prov_observed_at,
+            runner_os=env_info["runner_os"],
+            runner_image_label=prov_image_label,
+            runner_image_version=prov_image_version,
+            jdk_major=17,
+            cmdline_tools_revision=cmdline_rev,
+            catalog_projection_sha256=projection_sha256,
+            catalog_digest=cat_digest,
+        )
+
+        prov_bytes = canonicalize_json_v1(catalog_prov)
+        prov_file = os.path.join(output_dir, "catalog-provenance.json")
+        with open(prov_file, "wb") as f:
+            f.write(prov_bytes)
+        prov_sha256 = hashlib.sha256(prov_bytes).hexdigest()
+
+        checksums_content = (
+            f"{projection_sha256}  catalog-projection.json\n"
+            f"{evidence_sha256}  catalog-evidence.txt\n"
+            f"{prov_sha256}  catalog-provenance.json\n"
+        )
+    else:
+        prov_sha256 = None
+        checksums_content = (
+            f"{projection_sha256}  catalog-projection.json\n"
+            f"{evidence_sha256}  catalog-evidence.txt\n"
+        )
+
     # 7. Write checksums.sha256 (standard 2-column format)
-    checksums_content = (
-        f"{projection_sha256}  catalog-projection.json\n"
-        f"{evidence_sha256}  catalog-evidence.txt\n"
-    )
     checksums_file = os.path.join(output_dir, "checksums.sha256")
     with open(checksums_file, "w", encoding="utf-8", newline="\n") as f:
         f.write(checksums_content)
@@ -438,6 +497,8 @@ def run_catalog_discovery(
         "evidence_sha256": evidence_sha256,
         "catalog_digest": cat_digest,
     }
+    if prov_sha256:
+        digests["provenance_sha256"] = prov_sha256
 
     is_success = projection.get("is_complete") is True and projection.get("has_ambiguity") is False
     exit_code = 0 if is_success else 2

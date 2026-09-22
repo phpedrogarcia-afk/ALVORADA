@@ -5,16 +5,8 @@ on:
     inputs:
       expected_head_sha:
         description: 'Expected commit SHA on fio/g1-autonomy-recovery'
-        required: false
+        required: true
         type: string
-  push:
-    branches:
-      - fio/g1-autonomy-recovery
-    paths:
-      - '.github/workflows/e1-lab-catalog-discovery-recovery.yml'
-      - 'experiments/reliability-harness/scripts/catalog_discovery_runner.py'
-      - 'experiments/reliability-harness/scripts/catalog_core.py'
-      - 'experiments/reliability-harness/scripts/catalog_lock_model.py'
 
 permissions:
   contents: read
@@ -45,12 +37,16 @@ jobs:
         with:
           ref: ${{ github.sha }}
 
-      - name: Verify checked-out commit matches HEAD
+      - name: Verify checked-out commit matches HEAD and expected SHA
         shell: bash
         run: |
-          checked_out="$(git rev-parse HEAD)"
           expected="${{ inputs.expected_head_sha }}"
-          if [ -n "$expected" ] && [ "$checked_out" != "$expected" ]; then
+          if [ -z "$expected" ]; then
+            echo "ERROR: inputs.expected_head_sha is required but was empty" >&2
+            exit 1
+          fi
+          checked_out="$(git rev-parse HEAD)"
+          if [ "$checked_out" != "$expected" ]; then
             echo "ERROR: Checked-out commit ($checked_out) does not match expected_head_sha ($expected)" >&2
             exit 1
           fi

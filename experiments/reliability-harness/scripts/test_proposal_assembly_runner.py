@@ -17,6 +17,15 @@ if SCRIPTS_DIR not in sys.path:
     sys.path.insert(0, SCRIPTS_DIR)
 
 from catalog_core import canonicalize_json_v1
+from catalog_lock_model import (
+    CONTRACT_LOCK_PROPOSAL,
+    CONTRACT_LOCK_PROPOSAL_V2,
+    create_gpu_projection,
+    compute_gpu_projection_sha256,
+    create_catalog_provenance,
+    create_gpu_provenance,
+    create_catalog_digest_payload,
+)
 from proposal_assembly_runner import (
     assemble_lock_proposal,
     generate_proposal_report_text,
@@ -45,15 +54,17 @@ class TestProposalAssemblyRunner(unittest.TestCase):
         with open(self.projection_path, "wb") as f:
             f.write(canonicalize_json_v1(self.projection_data))
 
-        proj_sha = hashlib.sha256(canonicalize_json_v1(self.projection_data)).hexdigest()
+        modes = ["auto", "host", "lavapipe", "software", "swangle", "swiftshader"]
+        gpu_proj = create_gpu_projection("37.1.11", modes)
+        gpu_proj_sha = compute_gpu_projection_sha256(gpu_proj)
 
         self.gpu_evidence_path = os.path.join(self.temp_dir, "gpu-evidence.json")
         self.gpu_evidence_data = {
-            "candidate_modes": ["auto", "host", "lavapipe", "software", "swangle", "swiftshader"],
+            "candidate_modes": modes,
             "emulator_revision": "37.1.11",
             "evidence_ready": True,
             "parser_status": "PASS_STRICT",
-            "projection_sha256": proj_sha,
+            "projection_sha256": gpu_proj_sha,
             "status": "PASS_STRICT",
         }
         with open(self.gpu_evidence_path, "wb") as f:
@@ -61,6 +72,19 @@ class TestProposalAssemblyRunner(unittest.TestCase):
 
     def tearDown(self):
         shutil.rmtree(self.temp_dir, ignore_errors=True)
+
+    def _write_checksums(self, directory: str) -> None:
+        entries = []
+        for name in sorted(os.listdir(directory)):
+            if name == "checksums.sha256":
+                continue
+            path = os.path.join(directory, name)
+            if os.path.isfile(path):
+                with open(path, "rb") as f:
+                    digest = hashlib.sha256(f.read()).hexdigest()
+                entries.append(f"{digest}  {name}\n")
+        with open(os.path.join(directory, "checksums.sha256"), "w", encoding="utf-8") as f:
+            f.writelines(entries)
 
     def test_assemble_lock_proposal_success(self):
         exit_code, proposal, proposal_digest = assemble_lock_proposal(
@@ -129,6 +153,330 @@ class TestProposalAssemblyRunner(unittest.TestCase):
                 output_dir=self.out_dir,
                 environment_override=bad_env,
             )
+
+    def test_assemble_v2_from_directories_success(self):
+        cat_dir = os.path.join(self.temp_dir, "cat_artifacts")
+        gpu_dir = os.path.join(self.temp_dir, "gpu_artifacts")
+        os.makedirs(cat_dir, exist_ok=True)
+        os.makedirs(gpu_dir, exist_ok=True)
+
+        # 1. Catalog artifacts
+        shutil.copyfile(self.projection_path, os.path.join(cat_dir, "catalog-projection.json"))
+        cat_payload = create_catalog_digest_payload(self.projection_data)
+        cat_digest = hashlib.sha256(canonicalize_json_v1(cat_payload)).hexdigest()
+        cat_proj_sha = hashlib.sha256(canonicalize_json_v1(self.projection_data)).hexdigest()
+
+        cat_prov = create_catalog_provenance(
+            repository_commit_sha="1111111111111111111111111111111111111111",
+            run_id="101",
+            observed_at="2026-09-22T02:00:00Z",
+            runner_os="Linux",
+            runner_image_label="ubuntu24",
+            runner_image_version="20260907.300.1",
+            jdk_major=17,
+            cmdline_tools_revision="12.0",
+            catalog_projection_sha256=cat_proj_sha,
+            catalog_digest=cat_digest,
+        )
+        cat_prov_bytes = canonicalize_json_v1(cat_prov)
+        with open(os.path.join(cat_dir, "catalog-provenance.json"), "wb") as f:
+            f.write(cat_prov_bytes)
+        cat_prov_sha = hashlib.sha256(cat_prov_bytes).hexdigest()
+
+        with open(os.path.join(cat_dir, "checksums.sha256"), "w", encoding="utf-8") as f:
+            f.write(f"{cat_proj_sha}  catalog-projection.json\n{cat_prov_sha}  catalog-provenance.json\n")
+
+        # 2. GPU artifacts
+        modes = ["auto", "host", "lavapipe", "software", "swangle", "swiftshader"]
+        gpu_proj = create_gpu_projection("37.1.11", modes)
+        gpu_proj_bytes = canonicalize_json_v1(gpu_proj)
+        gpu_proj_sha = hashlib.sha256(gpu_proj_bytes).hexdigest()
+        with open(os.path.join(gpu_dir, "gpu-projection.json"), "wb") as f:
+            f.write(gpu_proj_bytes)
+
+        gpu_prov = create_gpu_provenance(
+            repository_commit_sha="2222222222222222222222222222222222222222",
+            run_id="202",
+            observed_at="2026-09-22T04:00:00Z",
+            runner_os="Linux",
+            runner_image_label="ubuntu24",
+            runner_image_version="20260907.300.1",
+            emulator_revision="37.1.11",
+            gpu_projection_sha256=gpu_proj_sha,
+        )
+        gpu_prov_bytes = canonicalize_json_v1(gpu_prov)
+        gpu_prov_sha = hashlib.sha256(gpu_prov_bytes).hexdigest()
+        with open(os.path.join(gpu_dir, "gpu-provenance.json"), "wb") as f:
+            f.write(gpu_prov_bytes)
+
+        gpu_ev = dict(self.gpu_evidence_data)
+        gpu_ev["projection_sha256"] = gpu_proj_sha
+        gpu_ev_bytes = canonicalize_json_v1(gpu_ev)
+        gpu_ev_sha = hashlib.sha256(gpu_ev_bytes).hexdigest()
+        with open(os.path.join(gpu_dir, "gpu-evidence.json"), "wb") as f:
+            f.write(gpu_ev_bytes)
+
+        with open(os.path.join(gpu_dir, "checksums.sha256"), "w", encoding="utf-8") as f:
+            f.write(f"{gpu_proj_sha}  gpu-projection.json\n{gpu_prov_sha}  gpu-provenance.json\n{gpu_ev_sha}  gpu-evidence.json\n")
+
+        # Execute assembly
+        exit_code, proposal, prop_digest = assemble_lock_proposal(
+            output_dir=self.out_dir,
+            catalog_dir=cat_dir,
+            gpu_dir=gpu_dir,
+        )
+
+        self.assertEqual(exit_code, 0)
+        self.assertEqual(proposal["contract"], "ALVORADA_LOCK_PROPOSAL_V2")
+        self.assertEqual(proposal["provenance"]["catalog_commit_sha"], "1111111111111111111111111111111111111111")
+        self.assertEqual(proposal["provenance"]["catalog_run_id"], "101")
+        self.assertEqual(proposal["provenance"]["gpu_commit_sha"], "2222222222222222222222222222222222222222")
+        self.assertEqual(proposal["provenance"]["gpu_run_id"], "202")
+
+        # Causal freshness: proposal observed_at = max(cat_obs, gpu_obs)
+        self.assertEqual(proposal["freshness"]["observed_at"], "2026-09-22T04:00:00Z")
+        self.assertEqual(proposal["freshness"]["fresh_until"], "2026-09-29T04:00:00Z")
+
+    def test_assemble_v2_tampered_checksum_fails(self):
+        cat_dir = os.path.join(self.temp_dir, "cat_tampered")
+        gpu_dir = os.path.join(self.temp_dir, "gpu_ok")
+        os.makedirs(cat_dir, exist_ok=True)
+        os.makedirs(gpu_dir, exist_ok=True)
+
+        with open(os.path.join(cat_dir, "catalog-projection.json"), "wb") as f:
+            f.write(b"tampered")
+        with open(os.path.join(cat_dir, "checksums.sha256"), "w", encoding="utf-8") as f:
+            f.write("0000000000000000000000000000000000000000000000000000000000000000  catalog-projection.json\n")
+
+        with self.assertRaises(ValueError) as ctx:
+            assemble_lock_proposal(
+                output_dir=self.out_dir,
+                catalog_dir=cat_dir,
+                gpu_dir=gpu_dir,
+            )
+        self.assertIn("CHECKSUM_MISMATCH", str(ctx.exception))
+
+    def test_assemble_v2_cross_run_runner_mismatch_fails(self):
+        cat_dir = os.path.join(self.temp_dir, "cat_runner")
+        gpu_dir = os.path.join(self.temp_dir, "gpu_runner")
+        os.makedirs(cat_dir, exist_ok=True)
+        os.makedirs(gpu_dir, exist_ok=True)
+
+        shutil.copyfile(self.projection_path, os.path.join(cat_dir, "catalog-projection.json"))
+        cat_payload = create_catalog_digest_payload(self.projection_data)
+        cat_digest = hashlib.sha256(canonicalize_json_v1(cat_payload)).hexdigest()
+        cat_proj_sha = hashlib.sha256(canonicalize_json_v1(self.projection_data)).hexdigest()
+
+        cat_prov = create_catalog_provenance(
+            repository_commit_sha="1111111111111111111111111111111111111111",
+            run_id="101",
+            observed_at="2026-09-22T02:00:00Z",
+            runner_os="Linux",
+            runner_image_label="ubuntu24",
+            runner_image_version="20260907.300.1",
+            jdk_major=17,
+            cmdline_tools_revision="12.0",
+            catalog_projection_sha256=cat_proj_sha,
+            catalog_digest=cat_digest,
+        )
+        with open(os.path.join(cat_dir, "catalog-provenance.json"), "wb") as f:
+            f.write(canonicalize_json_v1(cat_prov))
+
+        modes = ["auto", "host", "lavapipe", "software", "swangle", "swiftshader"]
+        gpu_proj = create_gpu_projection("37.1.11", modes)
+        with open(os.path.join(gpu_dir, "gpu-projection.json"), "wb") as f:
+            f.write(canonicalize_json_v1(gpu_proj))
+
+        # Runner image label mismatch on GPU run
+        gpu_prov = create_gpu_provenance(
+            repository_commit_sha="2222222222222222222222222222222222222222",
+            run_id="202",
+            observed_at="2026-09-22T04:00:00Z",
+            runner_os="Linux",
+            runner_image_label="ubuntu22",  # Mismatch!
+            runner_image_version="20260907.300.1",
+            emulator_revision="37.1.11",
+            gpu_projection_sha256=compute_gpu_projection_sha256(gpu_proj),
+        )
+        with open(os.path.join(gpu_dir, "gpu-provenance.json"), "wb") as f:
+            f.write(canonicalize_json_v1(gpu_prov))
+
+        gpu_ev = dict(self.gpu_evidence_data)
+        gpu_ev["projection_sha256"] = compute_gpu_projection_sha256(gpu_proj)
+        with open(os.path.join(gpu_dir, "gpu-evidence.json"), "wb") as f:
+            f.write(canonicalize_json_v1(gpu_ev))
+
+        self._write_checksums(cat_dir)
+        self._write_checksums(gpu_dir)
+
+        with self.assertRaises(ValueError) as ctx:
+            assemble_lock_proposal(
+                output_dir=self.out_dir,
+                catalog_dir=cat_dir,
+                gpu_dir=gpu_dir,
+            )
+        self.assertIn("CROSS_RUN_RUNNER_LABEL_MISMATCH", str(ctx.exception))
+
+    def test_assemble_v2_cross_run_runner_version_mismatch_fails(self):
+        cat_dir = os.path.join(self.temp_dir, "cat_version")
+        gpu_dir = os.path.join(self.temp_dir, "gpu_version")
+        os.makedirs(cat_dir, exist_ok=True)
+        os.makedirs(gpu_dir, exist_ok=True)
+
+        shutil.copyfile(self.projection_path, os.path.join(cat_dir, "catalog-projection.json"))
+        cat_payload = create_catalog_digest_payload(self.projection_data)
+        cat_digest = hashlib.sha256(canonicalize_json_v1(cat_payload)).hexdigest()
+        cat_proj_sha = hashlib.sha256(canonicalize_json_v1(self.projection_data)).hexdigest()
+
+        cat_prov = create_catalog_provenance(
+            repository_commit_sha="1111111111111111111111111111111111111111",
+            run_id="101",
+            observed_at="2026-09-22T02:00:00Z",
+            runner_os="Linux",
+            runner_image_label="ubuntu24",
+            runner_image_version="20260907.300.1",
+            jdk_major=17,
+            cmdline_tools_revision="12.0",
+            catalog_projection_sha256=cat_proj_sha,
+            catalog_digest=cat_digest,
+        )
+        with open(os.path.join(cat_dir, "catalog-provenance.json"), "wb") as f:
+            f.write(canonicalize_json_v1(cat_prov))
+
+        modes = ["auto", "host", "lavapipe", "software", "swangle", "swiftshader"]
+        gpu_proj = create_gpu_projection("37.1.11", modes)
+        with open(os.path.join(gpu_dir, "gpu-projection.json"), "wb") as f:
+            f.write(canonicalize_json_v1(gpu_proj))
+
+        # Runner image version mismatch on GPU run
+        gpu_prov = create_gpu_provenance(
+            repository_commit_sha="2222222222222222222222222222222222222222",
+            run_id="202",
+            observed_at="2026-09-22T04:00:00Z",
+            runner_os="Linux",
+            runner_image_label="ubuntu24",
+            runner_image_version="20260901.100.0",  # Mismatch!
+            emulator_revision="37.1.11",
+            gpu_projection_sha256=compute_gpu_projection_sha256(gpu_proj),
+        )
+        with open(os.path.join(gpu_dir, "gpu-provenance.json"), "wb") as f:
+            f.write(canonicalize_json_v1(gpu_prov))
+
+        gpu_ev = dict(self.gpu_evidence_data)
+        gpu_ev["projection_sha256"] = compute_gpu_projection_sha256(gpu_proj)
+        with open(os.path.join(gpu_dir, "gpu-evidence.json"), "wb") as f:
+            f.write(canonicalize_json_v1(gpu_ev))
+
+        self._write_checksums(cat_dir)
+        self._write_checksums(gpu_dir)
+
+        with self.assertRaises(ValueError) as ctx:
+            assemble_lock_proposal(
+                output_dir=self.out_dir,
+                catalog_dir=cat_dir,
+                gpu_dir=gpu_dir,
+            )
+        self.assertIn("CROSS_RUN_RUNNER_VERSION_MISMATCH", str(ctx.exception))
+
+    def test_assemble_v2_emulator_revision_mismatch_fails(self):
+        cat_dir = os.path.join(self.temp_dir, "cat_emu")
+        gpu_dir = os.path.join(self.temp_dir, "gpu_emu")
+        os.makedirs(cat_dir, exist_ok=True)
+        os.makedirs(gpu_dir, exist_ok=True)
+
+        shutil.copyfile(self.projection_path, os.path.join(cat_dir, "catalog-projection.json"))
+        cat_payload = create_catalog_digest_payload(self.projection_data)
+        cat_digest = hashlib.sha256(canonicalize_json_v1(cat_payload)).hexdigest()
+        cat_proj_sha = hashlib.sha256(canonicalize_json_v1(self.projection_data)).hexdigest()
+
+        cat_prov = create_catalog_provenance(
+            repository_commit_sha="1111111111111111111111111111111111111111",
+            run_id="101",
+            observed_at="2026-09-22T02:00:00Z",
+            runner_os="Linux",
+            runner_image_label="ubuntu24",
+            runner_image_version="20260907.300.1",
+            jdk_major=17,
+            cmdline_tools_revision="12.0",
+            catalog_projection_sha256=cat_proj_sha,
+            catalog_digest=cat_digest,
+        )
+        with open(os.path.join(cat_dir, "catalog-provenance.json"), "wb") as f:
+            f.write(canonicalize_json_v1(cat_prov))
+
+        modes = ["auto", "host", "lavapipe", "software", "swangle", "swiftshader"]
+        gpu_proj = create_gpu_projection("37.1.12", modes)  # Spliced 37.1.12 vs catalog 37.1.11!
+        with open(os.path.join(gpu_dir, "gpu-projection.json"), "wb") as f:
+            f.write(canonicalize_json_v1(gpu_proj))
+
+        gpu_prov = create_gpu_provenance(
+            repository_commit_sha="2222222222222222222222222222222222222222",
+            run_id="202",
+            observed_at="2026-09-22T04:00:00Z",
+            runner_os="Linux",
+            runner_image_label="ubuntu24",
+            runner_image_version="20260907.300.1",
+            emulator_revision="37.1.12",
+            gpu_projection_sha256=compute_gpu_projection_sha256(gpu_proj),
+        )
+        with open(os.path.join(gpu_dir, "gpu-provenance.json"), "wb") as f:
+            f.write(canonicalize_json_v1(gpu_prov))
+
+        gpu_ev = dict(self.gpu_evidence_data)
+        gpu_ev["emulator_revision"] = "37.1.12"
+        gpu_ev["projection_sha256"] = compute_gpu_projection_sha256(gpu_proj)
+        with open(os.path.join(gpu_dir, "gpu-evidence.json"), "wb") as f:
+            f.write(canonicalize_json_v1(gpu_ev))
+
+        self._write_checksums(cat_dir)
+        self._write_checksums(gpu_dir)
+
+        with self.assertRaises(ValueError) as ctx:
+            assemble_lock_proposal(
+                output_dir=self.out_dir,
+                catalog_dir=cat_dir,
+                gpu_dir=gpu_dir,
+            )
+        self.assertIn("EMULATOR_REVISION_MISMATCH", str(ctx.exception))
+
+    def test_assemble_v2_tampered_gpu_evidence_checksum_fails(self):
+        cat_dir = os.path.join(self.temp_dir, "cat_ok")
+        gpu_dir = os.path.join(self.temp_dir, "gpu_tampered")
+        os.makedirs(cat_dir, exist_ok=True)
+        os.makedirs(gpu_dir, exist_ok=True)
+
+        shutil.copyfile(self.projection_path, os.path.join(cat_dir, "catalog-projection.json"))
+        self._write_checksums(cat_dir)
+
+        with open(os.path.join(gpu_dir, "gpu-evidence.json"), "wb") as f:
+            f.write(b"tampered_gpu_data")
+        with open(os.path.join(gpu_dir, "checksums.sha256"), "w", encoding="utf-8") as f:
+            f.write("0000000000000000000000000000000000000000000000000000000000000000  gpu-evidence.json\n")
+
+        with self.assertRaises(ValueError) as ctx:
+            assemble_lock_proposal(
+                output_dir=self.out_dir,
+                catalog_dir=cat_dir,
+                gpu_dir=gpu_dir,
+            )
+        self.assertIn("CHECKSUM_MISMATCH", str(ctx.exception))
+
+    def test_assemble_v2_missing_checksums_fails(self):
+        cat_dir = os.path.join(self.temp_dir, "cat_no_chk")
+        gpu_dir = os.path.join(self.temp_dir, "gpu_no_chk")
+        os.makedirs(cat_dir, exist_ok=True)
+        os.makedirs(gpu_dir, exist_ok=True)
+
+        shutil.copyfile(self.projection_path, os.path.join(cat_dir, "catalog-projection.json"))
+        shutil.copyfile(self.gpu_evidence_path, os.path.join(gpu_dir, "gpu-evidence.json"))
+
+        with self.assertRaises(FileNotFoundError) as ctx:
+            assemble_lock_proposal(
+                output_dir=self.out_dir,
+                catalog_dir=cat_dir,
+                gpu_dir=gpu_dir,
+            )
+        self.assertIn("MISSING_CHECKSUMS_FILE", str(ctx.exception))
 
 
 if __name__ == "__main__":

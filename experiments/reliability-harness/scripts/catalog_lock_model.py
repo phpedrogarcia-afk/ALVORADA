@@ -47,6 +47,10 @@ from catalog_core import (
 
 CONTRACT_CATALOG_DIGEST_PAYLOAD = "ALVORADA_CATALOG_DIGEST_PAYLOAD_V1"
 CONTRACT_LOCK_PROPOSAL = "ALVORADA_LOCK_PROPOSAL_V1"
+CONTRACT_LOCK_PROPOSAL_V2 = "ALVORADA_LOCK_PROPOSAL_V2"
+CONTRACT_GPU_PROJECTION = "ALVORADA_GPU_PROJECTION_V1"
+CONTRACT_GPU_PROVENANCE = "ALVORADA_GPU_PROVENANCE_V1"
+CONTRACT_CATALOG_PROVENANCE = "ALVORADA_CATALOG_PROVENANCE_V1"
 CONTRACT_HUMAN_DECISION = "ALVORADA_HUMAN_LOCK_DECISION_V1"
 CONTRACT_LOCK_PAYLOAD = "ALVORADA_LOCK_PAYLOAD_V1"
 
@@ -111,6 +115,59 @@ ALLOWED_GPU_EVIDENCE_KEYS = {
     "parser_status",
     "projection_sha256",
     "status",
+}
+
+ALLOWED_GPU_PROJECTION_KEYS = {
+    "candidate_modes",
+    "contract",
+    "emulator_revision",
+}
+
+ALLOWED_GPU_PROVENANCE_KEYS = {
+    "contract",
+    "emulator_revision",
+    "gpu_projection_sha256",
+    "observed_at",
+    "repository_commit_sha",
+    "run_id",
+    "runner_image_label",
+    "runner_image_version",
+    "runner_os",
+}
+
+ALLOWED_CATALOG_PROVENANCE_KEYS = {
+    "catalog_digest",
+    "catalog_projection_sha256",
+    "cmdline_tools_revision",
+    "contract",
+    "jdk_major",
+    "observed_at",
+    "repository_commit_sha",
+    "run_id",
+    "runner_image_label",
+    "runner_image_version",
+    "runner_os",
+}
+
+ALLOWED_PROPOSAL_V2_KEYS = {
+    "catalog_digest",
+    "contract",
+    "environment",
+    "freshness",
+    "gpu_evidence",
+    "hard_locks",
+    "proposal_state",
+    "provenance",
+    "ready_for_human_review",
+}
+
+ALLOWED_PROVENANCE_V2_KEYS = {
+    "catalog_commit_sha",
+    "catalog_run_id",
+    "gpu_commit_sha",
+    "gpu_run_id",
+    "runner_image_label",
+    "runner_image_version",
 }
 
 
@@ -273,10 +330,6 @@ def compute_catalog_digest(projection: Dict[str, Any]) -> Tuple[str, Dict[str, A
     return digest, payload
 
 
-# -----------------------------------------------------------------------------
-# 2. IMMUTABLE LOCK PROPOSAL & STRUCTURAL VALIDATION
-# -----------------------------------------------------------------------------
-
 def _validate_no_local_paths(data: Any, context: str) -> None:
     """Recursively validates that local absolute/workspace paths do not enter digests."""
     forbidden_path_patterns = [
@@ -301,25 +354,198 @@ def _validate_no_local_paths(data: Any, context: str) -> None:
             _validate_no_local_paths(item, f"{context}[{idx}]")
 
 
+# -----------------------------------------------------------------------------
+# 1b. GPU PROJECTION & PROVENANCE MODELS
+# -----------------------------------------------------------------------------
+
+def validate_gpu_projection(projection: Any) -> None:
+    if not isinstance(projection, dict):
+        raise TypeError("gpu_projection must be a dictionary")
+    _validate_no_local_paths(projection, "gpu_projection")
+    if set(projection.keys()) != ALLOWED_GPU_PROJECTION_KEYS:
+        extra = set(projection.keys()) - ALLOWED_GPU_PROJECTION_KEYS
+        missing = ALLOWED_GPU_PROJECTION_KEYS - set(projection.keys())
+        raise ValueError(
+            f"INVALID_GPU_PROJECTION: Unexpected keys {sorted(extra)} or missing keys {sorted(missing)}"
+        )
+    if projection.get("contract") != CONTRACT_GPU_PROJECTION:
+        raise ValueError(
+            f"INVALID_GPU_PROJECTION_CONTRACT: Expected {CONTRACT_GPU_PROJECTION}, got {projection.get('contract')!r}"
+        )
+    emu_rev = projection.get("emulator_revision")
+    if not isinstance(emu_rev, str) or not emu_rev.strip():
+        raise ValueError("INVALID_GPU_PROJECTION: emulator_revision must be a non-empty string")
+    modes = projection.get("candidate_modes")
+    if not isinstance(modes, list) or len(modes) < 1:
+        raise ValueError("INVALID_GPU_PROJECTION: candidate_modes must be a non-empty list")
+    for m in modes:
+        if not isinstance(m, str) or not re.match(r"^[a-z][a-z0-9_-]{0,63}$", m):
+            raise ValueError(f"INVALID_GPU_PROJECTION: Invalid mode token: {m!r}")
+    if modes != sorted(list(set(modes))):
+        raise ValueError("INVALID_GPU_PROJECTION: candidate_modes must be sorted and deduplicated")
+
+
+def create_gpu_projection(emulator_revision: str, candidate_modes: List[str]) -> Dict[str, Any]:
+    if not isinstance(emulator_revision, str) or not emulator_revision.strip():
+        raise ValueError("emulator_revision must be a non-empty string")
+    if not isinstance(candidate_modes, (list, set)):
+        raise TypeError("candidate_modes must be a list or set")
+    dedup_sorted = sorted(list(set(candidate_modes)))
+    proj = {
+        "candidate_modes": dedup_sorted,
+        "contract": CONTRACT_GPU_PROJECTION,
+        "emulator_revision": emulator_revision.strip(),
+    }
+    validate_gpu_projection(proj)
+    return proj
+
+
+def compute_gpu_projection_sha256(projection: Dict[str, Any]) -> str:
+    validate_gpu_projection(projection)
+    return hash_canonical_json_v1(projection)
+
+
+def validate_gpu_provenance(prov: Any) -> None:
+    if not isinstance(prov, dict):
+        raise TypeError("gpu_provenance must be a dictionary")
+    _validate_no_local_paths(prov, "gpu_provenance")
+    if set(prov.keys()) != ALLOWED_GPU_PROVENANCE_KEYS:
+        extra = set(prov.keys()) - ALLOWED_GPU_PROVENANCE_KEYS
+        missing = ALLOWED_GPU_PROVENANCE_KEYS - set(prov.keys())
+        raise ValueError(
+            f"INVALID_GPU_PROVENANCE: Unexpected keys {sorted(extra)} or missing keys {sorted(missing)}"
+        )
+    if prov.get("contract") != CONTRACT_GPU_PROVENANCE:
+        raise ValueError(
+            f"INVALID_GPU_PROVENANCE_CONTRACT: Expected {CONTRACT_GPU_PROVENANCE}, got {prov.get('contract')!r}"
+        )
+    if not COMMIT_SHA_40_REGEX.match(prov.get("repository_commit_sha", "")):
+        raise ValueError("INVALID_GPU_PROVENANCE: repository_commit_sha must be 40 lowercase hex characters")
+    if not CATALOG_RUN_ID_REGEX.match(prov.get("run_id", "")):
+        raise ValueError("INVALID_GPU_PROVENANCE: run_id must be a positive decimal integer string")
+    validate_canonical_timestamp(prov.get("observed_at", ""))
+    for s_field in ["runner_os", "runner_image_label", "runner_image_version", "emulator_revision"]:
+        val = prov.get(s_field)
+        if not isinstance(val, str) or not val.strip():
+            raise ValueError(f"INVALID_GPU_PROVENANCE: {s_field} must be a non-empty string")
+    if not HEX_64_REGEX.match(prov.get("gpu_projection_sha256", "")):
+        raise ValueError("INVALID_GPU_PROVENANCE: gpu_projection_sha256 must be 64 lowercase hex characters")
+
+
+def create_gpu_provenance(
+    repository_commit_sha: str,
+    run_id: str,
+    observed_at: str,
+    runner_os: str,
+    runner_image_label: str,
+    runner_image_version: str,
+    emulator_revision: str,
+    gpu_projection_sha256: str,
+) -> Dict[str, Any]:
+    prov = {
+        "contract": CONTRACT_GPU_PROVENANCE,
+        "emulator_revision": emulator_revision.strip(),
+        "gpu_projection_sha256": gpu_projection_sha256.strip(),
+        "observed_at": observed_at.strip(),
+        "repository_commit_sha": repository_commit_sha.strip(),
+        "run_id": run_id.strip(),
+        "runner_image_label": runner_image_label.strip(),
+        "runner_image_version": runner_image_version.strip(),
+        "runner_os": runner_os.strip(),
+    }
+    validate_gpu_provenance(prov)
+    return prov
+
+
+def validate_catalog_provenance(prov: Any) -> None:
+    if not isinstance(prov, dict):
+        raise TypeError("catalog_provenance must be a dictionary")
+    _validate_no_local_paths(prov, "catalog_provenance")
+    if set(prov.keys()) != ALLOWED_CATALOG_PROVENANCE_KEYS:
+        extra = set(prov.keys()) - ALLOWED_CATALOG_PROVENANCE_KEYS
+        missing = ALLOWED_CATALOG_PROVENANCE_KEYS - set(prov.keys())
+        raise ValueError(
+            f"INVALID_CATALOG_PROVENANCE: Unexpected keys {sorted(extra)} or missing keys {sorted(missing)}"
+        )
+    if prov.get("contract") != CONTRACT_CATALOG_PROVENANCE:
+        raise ValueError(
+            f"INVALID_CATALOG_PROVENANCE_CONTRACT: Expected {CONTRACT_CATALOG_PROVENANCE}, got {prov.get('contract')!r}"
+        )
+    if not COMMIT_SHA_40_REGEX.match(prov.get("repository_commit_sha", "")):
+        raise ValueError("INVALID_CATALOG_PROVENANCE: repository_commit_sha must be 40 lowercase hex characters")
+    if not CATALOG_RUN_ID_REGEX.match(prov.get("run_id", "")):
+        raise ValueError("INVALID_CATALOG_PROVENANCE: run_id must be a positive decimal integer string")
+    validate_canonical_timestamp(prov.get("observed_at", ""))
+    jdk_major = prov.get("jdk_major")
+    if not isinstance(jdk_major, int) or jdk_major != 17 or isinstance(jdk_major, bool):
+        raise ValueError(f"INVALID_CATALOG_PROVENANCE: jdk_major must be integer 17, got {jdk_major!r}")
+    for s_field in ["runner_os", "runner_image_label", "runner_image_version", "cmdline_tools_revision"]:
+        val = prov.get(s_field)
+        if not isinstance(val, str) or not val.strip():
+            raise ValueError(f"INVALID_CATALOG_PROVENANCE: {s_field} must be a non-empty string")
+    if not HEX_64_REGEX.match(prov.get("catalog_projection_sha256", "")):
+        raise ValueError("INVALID_CATALOG_PROVENANCE: catalog_projection_sha256 must be 64 lowercase hex characters")
+    if not HEX_64_REGEX.match(prov.get("catalog_digest", "")):
+        raise ValueError("INVALID_CATALOG_PROVENANCE: catalog_digest must be 64 lowercase hex characters")
+
+
+def create_catalog_provenance(
+    repository_commit_sha: str,
+    run_id: str,
+    observed_at: str,
+    runner_os: str,
+    runner_image_label: str,
+    runner_image_version: str,
+    jdk_major: int,
+    cmdline_tools_revision: str,
+    catalog_projection_sha256: str,
+    catalog_digest: str,
+) -> Dict[str, Any]:
+    prov = {
+        "catalog_digest": catalog_digest.strip(),
+        "catalog_projection_sha256": catalog_projection_sha256.strip(),
+        "cmdline_tools_revision": cmdline_tools_revision.strip(),
+        "contract": CONTRACT_CATALOG_PROVENANCE,
+        "jdk_major": jdk_major,
+        "observed_at": observed_at.strip(),
+        "repository_commit_sha": repository_commit_sha.strip(),
+        "run_id": run_id.strip(),
+        "runner_image_label": runner_image_label.strip(),
+        "runner_image_version": runner_image_version.strip(),
+        "runner_os": runner_os.strip(),
+    }
+    validate_catalog_provenance(prov)
+    return prov
+
+
+# -----------------------------------------------------------------------------
+# 2. IMMUTABLE LOCK PROPOSAL & STRUCTURAL VALIDATION
+# -----------------------------------------------------------------------------
+
+
 def validate_lock_proposal(proposal: Any) -> None:
     """
-    Validates the structure and invariants of ALVORADA_LOCK_PROPOSAL_V1 before digest
+    Validates the structure and invariants of ALVORADA_LOCK_PROPOSAL (V1 or V2) before digest
     computation, decision verification, or lock candidate computation.
     Fails closed if any invariant is violated.
     """
     if not isinstance(proposal, dict):
         raise TypeError("proposal must be a dictionary")
 
+    contract = proposal.get("contract")
+    if contract == CONTRACT_LOCK_PROPOSAL_V2:
+        validate_lock_proposal_v2(proposal)
+        return
+    elif contract != CONTRACT_LOCK_PROPOSAL:
+        raise ValueError(
+            f"INVALID_LOCK_PROPOSAL: Invalid contract {contract!r}"
+        )
+
     if set(proposal.keys()) != ALLOWED_PROPOSAL_KEYS:
         extra = set(proposal.keys()) - ALLOWED_PROPOSAL_KEYS
         missing = ALLOWED_PROPOSAL_KEYS - set(proposal.keys())
         raise ValueError(
             f"INVALID_LOCK_PROPOSAL: Unexpected keys {sorted(extra)} or missing keys {sorted(missing)}"
-        )
-
-    if proposal.get("contract") != CONTRACT_LOCK_PROPOSAL:
-        raise ValueError(
-            f"INVALID_LOCK_PROPOSAL: Invalid contract {proposal.get('contract')!r}"
         )
 
     if proposal.get("proposal_state") != PROPOSAL_STATE_PENDING:
@@ -527,6 +753,244 @@ def validate_lock_proposal(proposal: Any) -> None:
     else:
         if ready_for_review is not False:
             raise ValueError("INVALID_LOCK_PROPOSAL: ready_for_human_review must be False when evidence_ready=False")
+
+
+def validate_lock_proposal_v2(proposal: Any) -> None:
+    """
+    Validates the structure and invariants of ALVORADA_LOCK_PROPOSAL_V2 before digest
+    computation, decision verification, or lock candidate computation.
+    Fails closed if any invariant is violated.
+    """
+    if not isinstance(proposal, dict):
+        raise TypeError("proposal must be a dictionary")
+
+    _validate_no_local_paths(proposal, "lock_proposal")
+
+    if set(proposal.keys()) != ALLOWED_PROPOSAL_V2_KEYS:
+        extra = set(proposal.keys()) - ALLOWED_PROPOSAL_V2_KEYS
+        missing = ALLOWED_PROPOSAL_V2_KEYS - set(proposal.keys())
+        raise ValueError(
+            f"INVALID_LOCK_PROPOSAL_V2: Unexpected keys {sorted(extra)} or missing keys {sorted(missing)}"
+        )
+
+    if proposal.get("contract") != CONTRACT_LOCK_PROPOSAL_V2:
+        raise ValueError(
+            f"INVALID_LOCK_PROPOSAL_V2: Invalid contract {proposal.get('contract')!r}"
+        )
+
+    if proposal.get("proposal_state") != PROPOSAL_STATE_PENDING:
+        raise ValueError(
+            f"INVALID_LOCK_PROPOSAL_V2: proposal_state must be {PROPOSAL_STATE_PENDING!r}, got {proposal.get('proposal_state')!r}"
+        )
+
+    ready_for_review = proposal.get("ready_for_human_review")
+    if not isinstance(ready_for_review, bool):
+        raise TypeError(
+            f"INVALID_LOCK_PROPOSAL_V2: ready_for_human_review must be boolean, got {type(ready_for_review)}"
+        )
+
+    catalog_digest = proposal.get("catalog_digest")
+    if not isinstance(catalog_digest, str) or not HEX_64_REGEX.match(catalog_digest):
+        raise ValueError("INVALID_LOCK_PROPOSAL_V2: catalog_digest must be lowercase 64-char hex SHA-256")
+
+    # Hard locks validation
+    hard_locks = proposal.get("hard_locks")
+    if not isinstance(hard_locks, list) or len(hard_locks) != 5:
+        raise ValueError("INVALID_LOCK_PROPOSAL_V2: hard_locks must be a list of exactly 5 entries")
+
+    hl_map: Dict[str, str] = {}
+    hl_paths: List[str] = []
+    allowed_hl_keys = {"package_path", "revision"}
+    for idx, hl in enumerate(hard_locks):
+        if not isinstance(hl, dict):
+            raise TypeError(f"INVALID_LOCK_PROPOSAL_V2: hard_locks[{idx}] must be a dict")
+        if set(hl.keys()) != allowed_hl_keys:
+            raise ValueError(f"INVALID_LOCK_PROPOSAL_V2: hard_locks[{idx}] has invalid keys")
+        path = hl.get("package_path")
+        rev = hl.get("revision")
+        if not isinstance(path, str) or not path.strip():
+            raise ValueError(f"INVALID_LOCK_PROPOSAL_V2: Invalid package_path in hard_locks[{idx}]")
+        if not isinstance(rev, str) or not rev.strip():
+            raise ValueError(f"INVALID_LOCK_PROPOSAL_V2: Invalid revision in hard_locks[{idx}]")
+        if path in hl_map:
+            raise ValueError(f"INVALID_LOCK_PROPOSAL_V2: Duplicate package_path {path!r} in hard_locks")
+        hl_map[path] = rev.strip()
+        hl_paths.append(path)
+
+    expected_set = set(HARD_LOCK_PACKAGES)
+    if set(hl_map.keys()) != expected_set:
+        raise ValueError("INVALID_LOCK_PROPOSAL_V2: hard_locks packages do not match HARD_LOCK_PACKAGES")
+    if hl_paths != sorted(expected_set):
+        raise ValueError("INVALID_LOCK_PROPOSAL_V2: hard_locks must be sorted lexicographically by package_path")
+
+    # Reconstruct catalog payload from hard_locks and verify against catalog_digest
+    reconstructed_cat_payload = {
+        "channel": 0,
+        "contract": CONTRACT_CATALOG_DIGEST_PAYLOAD,
+        "packages": [
+            {"catalog_revision": hl_map[p], "package_path": p}
+            for p in sorted(expected_set)
+        ],
+    }
+    reconstructed_cat_digest = hash_canonical_json_v1(reconstructed_cat_payload)
+    if reconstructed_cat_digest != catalog_digest:
+        raise ValueError(
+            f"INVALID_LOCK_PROPOSAL_V2: catalog_digest {catalog_digest!r} does not match hard_locks content {reconstructed_cat_digest!r}"
+        )
+
+    # Environment validation
+    environment = proposal.get("environment")
+    if not isinstance(environment, dict):
+        raise TypeError("INVALID_LOCK_PROPOSAL_V2: environment must be a dictionary")
+    _validate_no_local_paths(environment, "environment")
+
+    if set(environment.keys()) != ALLOWED_ENVIRONMENT_KEYS:
+        raise ValueError("INVALID_LOCK_PROPOSAL_V2: environment keys mismatch")
+
+    jdk_major = environment.get("jdk_major")
+    if not isinstance(jdk_major, int) or jdk_major != 17 or isinstance(jdk_major, bool):
+        raise ValueError(f"INVALID_LOCK_PROPOSAL_V2: environment.jdk_major must be integer 17, got {jdk_major!r}")
+
+    for k in ["cmdline_tools_revision", "emulator_revision", "runner_image_label", "runner_image_version", "runner_os"]:
+        v = environment.get(k)
+        if not isinstance(v, str) or not v.strip():
+            raise ValueError(f"INVALID_LOCK_PROPOSAL_V2: environment.{k} must be a non-empty string")
+
+    # Provenance V2 validation (binds both catalog and GPU runs)
+    provenance = proposal.get("provenance")
+    if not isinstance(provenance, dict):
+        raise TypeError("INVALID_LOCK_PROPOSAL_V2: provenance must be a dictionary")
+    _validate_no_local_paths(provenance, "provenance")
+
+    if set(provenance.keys()) != ALLOWED_PROVENANCE_V2_KEYS:
+        raise ValueError("INVALID_LOCK_PROPOSAL_V2: provenance keys mismatch")
+
+    for k in ALLOWED_PROVENANCE_V2_KEYS:
+        v = provenance.get(k)
+        if not isinstance(v, str) or not v.strip():
+            raise ValueError(f"INVALID_LOCK_PROPOSAL_V2: provenance.{k} must be a non-empty string")
+
+    if not COMMIT_SHA_40_REGEX.match(provenance["catalog_commit_sha"]):
+        raise ValueError(
+            "INVALID_LOCK_PROPOSAL_V2: provenance.catalog_commit_sha must be exactly 40 lowercase hex characters"
+        )
+    if not CATALOG_RUN_ID_REGEX.match(provenance["catalog_run_id"]):
+        raise ValueError(
+            "INVALID_LOCK_PROPOSAL_V2: provenance.catalog_run_id must be a positive decimal integer string"
+        )
+    if not COMMIT_SHA_40_REGEX.match(provenance["gpu_commit_sha"]):
+        raise ValueError(
+            "INVALID_LOCK_PROPOSAL_V2: provenance.gpu_commit_sha must be exactly 40 lowercase hex characters"
+        )
+    if not CATALOG_RUN_ID_REGEX.match(provenance["gpu_run_id"]):
+        raise ValueError(
+            "INVALID_LOCK_PROPOSAL_V2: provenance.gpu_run_id must be a positive decimal integer string"
+        )
+
+    # Environment / Provenance coherence
+    if environment["runner_image_label"].strip() != provenance["runner_image_label"].strip():
+        raise ValueError("INVALID_LOCK_PROPOSAL_V2: runner_image_label mismatch between environment and provenance")
+    if environment["runner_image_version"].strip() != provenance["runner_image_version"].strip():
+        raise ValueError("INVALID_LOCK_PROPOSAL_V2: runner_image_version mismatch between environment and provenance")
+
+    # Freshness validation
+    freshness = proposal.get("freshness")
+    if not isinstance(freshness, dict):
+        raise TypeError("INVALID_LOCK_PROPOSAL_V2: freshness must be a dictionary")
+
+    if set(freshness.keys()) != ALLOWED_FRESHNESS_KEYS:
+        raise ValueError("INVALID_LOCK_PROPOSAL_V2: freshness keys mismatch")
+
+    observed_at = freshness.get("observed_at")
+    fresh_until = freshness.get("fresh_until")
+    max_age_days = freshness.get("max_age_days")
+
+    if not isinstance(observed_at, str) or not isinstance(fresh_until, str):
+        raise ValueError("INVALID_LOCK_PROPOSAL_V2: observed_at and fresh_until must be strings")
+    if not isinstance(max_age_days, int) or max_age_days != MAX_FRESHNESS_DAYS or isinstance(max_age_days, bool):
+        raise ValueError(f"INVALID_LOCK_PROPOSAL_V2: max_age_days must be integer {MAX_FRESHNESS_DAYS}")
+
+    validate_canonical_timestamp(observed_at)
+    validate_canonical_timestamp(fresh_until)
+
+    dt_obs = datetime.datetime.strptime(observed_at, "%Y-%m-%dT%H:%M:%SZ")
+    dt_fresh = datetime.datetime.strptime(fresh_until, "%Y-%m-%dT%H:%M:%SZ")
+    if dt_fresh <= dt_obs:
+        raise ValueError("INVALID_LOCK_PROPOSAL_V2: fresh_until must be strictly greater than observed_at")
+    delta = dt_fresh - dt_obs
+    if delta.days != MAX_FRESHNESS_DAYS or delta.seconds != 0:
+        raise ValueError(f"INVALID_LOCK_PROPOSAL_V2: fresh_until must be exactly {MAX_FRESHNESS_DAYS} days after observed_at")
+
+    # GPU Evidence validation
+    gpu_evidence = proposal.get("gpu_evidence")
+    if not isinstance(gpu_evidence, dict):
+        raise TypeError("INVALID_LOCK_PROPOSAL_V2: gpu_evidence must be a dictionary")
+    _validate_no_local_paths(gpu_evidence, "gpu_evidence")
+
+    for prohibited in ["selected_gpu", "gpu_mode", "default_gpu"]:
+        if prohibited in gpu_evidence:
+            raise ValueError(f"GPU_SELECTION_PROHIBITED_IN_PROPOSAL: {prohibited!r} found in gpu_evidence")
+
+    if set(gpu_evidence.keys()) != ALLOWED_GPU_EVIDENCE_KEYS:
+        raise ValueError("INVALID_LOCK_PROPOSAL_V2: gpu_evidence keys mismatch")
+
+    gpu_status = gpu_evidence.get("status")
+    if gpu_status not in ALLOWED_GPU_STATUSES:
+        raise ValueError(f"INVALID_LOCK_PROPOSAL_V2: gpu_evidence.status invalid: {gpu_status!r}")
+
+    parser_status = gpu_evidence.get("parser_status")
+    if parser_status not in ALLOWED_GPU_PARSER_STATUSES:
+        raise ValueError(f"INVALID_LOCK_PROPOSAL_V2: gpu_evidence.parser_status invalid: {parser_status!r}")
+
+    evidence_ready = gpu_evidence.get("evidence_ready")
+    if not isinstance(evidence_ready, bool):
+        raise TypeError("INVALID_LOCK_PROPOSAL_V2: gpu_evidence.evidence_ready must be a boolean")
+
+    candidates_raw = gpu_evidence.get("candidate_modes")
+    if not isinstance(candidates_raw, list):
+        raise TypeError("INVALID_LOCK_PROPOSAL_V2: gpu_evidence.candidate_modes must be a list")
+    for m in candidates_raw:
+        if not isinstance(m, str) or not m.strip():
+            raise ValueError("INVALID_LOCK_PROPOSAL_V2: candidate_modes items must be non-empty strings")
+    if candidates_raw != sorted(list(set(candidates_raw))):
+        raise ValueError("INVALID_LOCK_PROPOSAL_V2: candidate_modes must be sorted and deduplicated")
+
+    gpu_emu_rev = gpu_evidence.get("emulator_revision")
+    if not isinstance(gpu_emu_rev, str) or not gpu_emu_rev.strip():
+        raise ValueError("INVALID_LOCK_PROPOSAL_V2: gpu_evidence.emulator_revision must be non-empty string")
+
+    projection_sha256 = gpu_evidence.get("projection_sha256")
+    if not isinstance(projection_sha256, str):
+        raise ValueError("INVALID_LOCK_PROPOSAL_V2: gpu_evidence.projection_sha256 must be a string")
+
+    # Tripartite emulator revision binding
+    env_emu_rev = environment["emulator_revision"].strip()
+    hl_emu_rev = hl_map["emulator"]
+    if gpu_emu_rev.strip() != env_emu_rev:
+        raise ValueError(
+            f"INVALID_LOCK_PROPOSAL_V2: gpu_evidence.emulator_revision ({gpu_emu_rev!r}) != environment.emulator_revision ({env_emu_rev!r})"
+        )
+    if env_emu_rev != hl_emu_rev:
+        raise ValueError(
+            f"INVALID_LOCK_PROPOSAL_V2: environment.emulator_revision ({env_emu_rev!r}) != hard_locks['emulator'] ({hl_emu_rev!r})"
+        )
+
+    if evidence_ready is True:
+        if gpu_status != "PASS_STRICT":
+            raise ValueError(f"INVALID_LOCK_PROPOSAL_V2: evidence_ready=True requires status='PASS_STRICT', got {gpu_status!r}")
+        if parser_status != "PASS_STRICT":
+            raise ValueError(f"INVALID_LOCK_PROPOSAL_V2: evidence_ready=True requires parser_status='PASS_STRICT', got {parser_status!r}")
+        if len(candidates_raw) < 1:
+            raise ValueError("INVALID_LOCK_PROPOSAL_V2: evidence_ready=True requires candidate_modes >= 1")
+        if not HEX_64_REGEX.match(projection_sha256):
+            raise ValueError(
+                f"INVALID_LOCK_PROPOSAL_V2: evidence_ready=True requires valid projection_sha256 (64 hex chars), got {projection_sha256!r}"
+            )
+        if ready_for_review is not True:
+            raise ValueError("INVALID_LOCK_PROPOSAL_V2: ready_for_human_review must be True when evidence_ready=True and all invariants pass")
+    else:
+        if ready_for_review is not False:
+            raise ValueError("INVALID_LOCK_PROPOSAL_V2: ready_for_human_review must be False when evidence_ready=False")
 
 
 def create_lock_proposal(
@@ -769,8 +1233,364 @@ def create_lock_proposal(
     return proposal
 
 
+def create_lock_proposal_v2(
+    catalog_digest_payload: Dict[str, Any],
+    environment: Dict[str, Any],
+    gpu_evidence: Dict[str, Any],
+    freshness: Dict[str, Any],
+    provenance: Dict[str, Any],
+) -> Dict[str, Any]:
+    """
+    Constructs an immutable ALVORADA_LOCK_PROPOSAL_V2.
+    Fails closed if any contractual invariants or extra semantic inputs are encountered.
+    """
+    # 1. Re-validate catalog digest payload directly
+    validate_catalog_digest_payload(catalog_digest_payload)
+    catalog_digest = hash_canonical_json_v1(catalog_digest_payload)
+
+    # 2. Derive hard_locks strictly from catalog_digest_payload
+    hard_locks = [
+        {
+            "package_path": p["package_path"],
+            "revision": p["catalog_revision"],
+        }
+        for p in sorted(catalog_digest_payload["packages"], key=lambda x: x["package_path"])
+    ]
+    hl_map = {hl["package_path"]: hl["revision"] for hl in hard_locks}
+
+    # 3. Validate environment (strictly closed schema: NO SILENTLY UNBOUND SEMANTIC INPUT)
+    if not isinstance(environment, dict):
+        raise TypeError("environment must be a dictionary")
+    _validate_no_local_paths(environment, "environment")
+
+    if set(environment.keys()) != ALLOWED_ENVIRONMENT_KEYS:
+        extra = set(environment.keys()) - ALLOWED_ENVIRONMENT_KEYS
+        missing = ALLOWED_ENVIRONMENT_KEYS - set(environment.keys())
+        raise ValueError(
+            f"INVALID_ENVIRONMENT: Unexpected keys {sorted(extra)} or missing keys {sorted(missing)}"
+        )
+
+    jdk_major = environment["jdk_major"]
+    if not isinstance(jdk_major, int) or jdk_major != 17 or isinstance(jdk_major, bool):
+        raise ValueError(f"environment.jdk_major must be integer 17, got {jdk_major!r}")
+
+    for req_field in [
+        "cmdline_tools_revision",
+        "emulator_revision",
+        "runner_os",
+        "runner_image_label",
+        "runner_image_version",
+    ]:
+        val = environment[req_field]
+        if not isinstance(val, str) or not val.strip():
+            raise ValueError(f"Missing or invalid environment field: {req_field}")
+
+    # Check hard_locks emulator revision against environment
+    if environment["emulator_revision"].strip() != hl_map["emulator"]:
+        raise ValueError(
+            f"environment.emulator_revision ({environment['emulator_revision']!r}) != hard_locks['emulator'] ({hl_map['emulator']!r})"
+        )
+
+    # 4. Validate provenance V2 (strictly closed schema: NO SILENTLY UNBOUND SEMANTIC INPUT)
+    if not isinstance(provenance, dict):
+        raise TypeError("provenance must be a dictionary")
+    _validate_no_local_paths(provenance, "provenance")
+
+    if set(provenance.keys()) != ALLOWED_PROVENANCE_V2_KEYS:
+        extra = set(provenance.keys()) - ALLOWED_PROVENANCE_V2_KEYS
+        missing = ALLOWED_PROVENANCE_V2_KEYS - set(provenance.keys())
+        raise ValueError(
+            f"INVALID_PROVENANCE_V2: Unexpected keys {sorted(extra)} or missing keys {sorted(missing)}"
+        )
+
+    for req_field in ALLOWED_PROVENANCE_V2_KEYS:
+        val = provenance[req_field]
+        if not isinstance(val, str) or not val.strip():
+            raise ValueError(f"Missing or invalid provenance field: {req_field}")
+
+    if not COMMIT_SHA_40_REGEX.match(provenance["catalog_commit_sha"]):
+        raise ValueError(
+            f"provenance.catalog_commit_sha must be exactly 40 lowercase hex characters, got {provenance['catalog_commit_sha']!r}"
+        )
+    if not CATALOG_RUN_ID_REGEX.match(provenance["catalog_run_id"]):
+        raise ValueError(
+            f"provenance.catalog_run_id must be a positive decimal integer string without signs, decimals, or spaces, got {provenance['catalog_run_id']!r}"
+        )
+    if not COMMIT_SHA_40_REGEX.match(provenance["gpu_commit_sha"]):
+        raise ValueError(
+            f"provenance.gpu_commit_sha must be exactly 40 lowercase hex characters, got {provenance['gpu_commit_sha']!r}"
+        )
+    if not CATALOG_RUN_ID_REGEX.match(provenance["gpu_run_id"]):
+        raise ValueError(
+            f"provenance.gpu_run_id must be a positive decimal integer string without signs, decimals, or spaces, got {provenance['gpu_run_id']!r}"
+        )
+
+    # Environment / Provenance runner image coherence
+    if environment["runner_image_label"].strip() != provenance["runner_image_label"].strip():
+        raise ValueError(
+            f"runner_image_label mismatch: environment ({environment['runner_image_label']!r}) != provenance ({provenance['runner_image_label']!r})"
+        )
+    if environment["runner_image_version"].strip() != provenance["runner_image_version"].strip():
+        raise ValueError(
+            f"runner_image_version mismatch: environment ({environment['runner_image_version']!r}) != provenance ({provenance['runner_image_version']!r})"
+        )
+
+    # 5. Validate freshness (strictly closed schema: NO SILENTLY UNBOUND SEMANTIC INPUT)
+    if not isinstance(freshness, dict):
+        raise TypeError("freshness must be a dictionary")
+
+    if set(freshness.keys()) != ALLOWED_FRESHNESS_KEYS:
+        extra = set(freshness.keys()) - ALLOWED_FRESHNESS_KEYS
+        missing = ALLOWED_FRESHNESS_KEYS - set(freshness.keys())
+        raise ValueError(
+            f"INVALID_FRESHNESS: Unexpected keys {sorted(extra)} or missing keys {sorted(missing)}"
+        )
+
+    observed_at = freshness["observed_at"]
+    fresh_until = freshness["fresh_until"]
+    max_age_days = freshness["max_age_days"]
+
+    if not isinstance(observed_at, str) or not isinstance(fresh_until, str):
+        raise ValueError("freshness timestamps must be strings")
+    if not isinstance(max_age_days, int) or max_age_days != MAX_FRESHNESS_DAYS or isinstance(max_age_days, bool):
+        raise ValueError(f"freshness.max_age_days must be integer {MAX_FRESHNESS_DAYS}")
+
+    validate_canonical_timestamp(observed_at)
+    validate_canonical_timestamp(fresh_until)
+
+    dt_obs = datetime.datetime.strptime(observed_at, "%Y-%m-%dT%H:%M:%SZ")
+    dt_fresh = datetime.datetime.strptime(fresh_until, "%Y-%m-%dT%H:%M:%SZ")
+
+    if dt_fresh <= dt_obs:
+        raise ValueError("fresh_until must be strictly greater than observed_at")
+
+    delta = dt_fresh - dt_obs
+    if delta.days != MAX_FRESHNESS_DAYS or delta.seconds != 0:
+        raise ValueError(
+            f"fresh_until must be exactly {MAX_FRESHNESS_DAYS} days after observed_at, got delta {delta}"
+        )
+
+    # 6. Validate GPU evidence (strictly closed schema: NO SILENTLY UNBOUND SEMANTIC INPUT)
+    if not isinstance(gpu_evidence, dict):
+        raise TypeError("gpu_evidence must be a dictionary")
+    _validate_no_local_paths(gpu_evidence, "gpu_evidence")
+
+    for prohibited in ["selected_gpu", "gpu_mode", "default_gpu"]:
+        if prohibited in gpu_evidence:
+            raise ValueError(
+                f"GPU_SELECTION_PROHIBITED_IN_PROPOSAL: {prohibited!r} found in gpu_evidence"
+            )
+
+    if set(gpu_evidence.keys()) != ALLOWED_GPU_EVIDENCE_KEYS:
+        extra = set(gpu_evidence.keys()) - ALLOWED_GPU_EVIDENCE_KEYS
+        missing = ALLOWED_GPU_EVIDENCE_KEYS - set(gpu_evidence.keys())
+        raise ValueError(
+            f"INVALID_GPU_EVIDENCE: Unexpected keys {sorted(extra)} or missing keys {sorted(missing)}"
+        )
+
+    gpu_status = gpu_evidence["status"]
+    if gpu_status not in ALLOWED_GPU_STATUSES:
+        raise ValueError(f"gpu_evidence.status invalid: {gpu_status!r}")
+
+    parser_status = gpu_evidence["parser_status"]
+    if parser_status not in ALLOWED_GPU_PARSER_STATUSES:
+        raise ValueError(f"gpu_evidence.parser_status invalid: {parser_status!r}")
+
+    evidence_ready = gpu_evidence["evidence_ready"]
+    if not isinstance(evidence_ready, bool):
+        raise TypeError("gpu_evidence.evidence_ready must be a boolean")
+
+    candidates_raw = gpu_evidence["candidate_modes"]
+    if not isinstance(candidates_raw, (list, set)):
+        raise TypeError("gpu_evidence.candidate_modes must be a list or set")
+    candidate_modes = sorted(list(set(candidates_raw)))
+
+    gpu_emu_rev = gpu_evidence["emulator_revision"]
+    if not isinstance(gpu_emu_rev, str) or not gpu_emu_rev.strip():
+        raise ValueError("gpu_evidence.emulator_revision must be a non-empty string")
+
+    # GPU revision binding to environment
+    if gpu_emu_rev.strip() != environment["emulator_revision"].strip():
+        raise ValueError(
+            f"gpu_evidence.emulator_revision ({gpu_emu_rev!r}) != environment.emulator_revision ({environment['emulator_revision']!r})"
+        )
+
+    projection_sha256 = gpu_evidence["projection_sha256"]
+    if not isinstance(projection_sha256, str):
+        raise ValueError("gpu_evidence.projection_sha256 must be a string")
+
+    if evidence_ready:
+        if gpu_status != "PASS_STRICT":
+            raise ValueError(
+                f"gpu_evidence.evidence_ready=True requires status='PASS_STRICT', got {gpu_status!r}"
+            )
+        if parser_status != "PASS_STRICT":
+            raise ValueError(
+                f"gpu_evidence.evidence_ready=True requires parser_status='PASS_STRICT', got {parser_status!r}"
+            )
+        if len(candidate_modes) < 1:
+            raise ValueError("gpu_evidence.evidence_ready=True requires candidate_modes >= 1")
+        if not HEX_64_REGEX.match(projection_sha256.strip()):
+            raise ValueError(
+                f"gpu_evidence.evidence_ready=True requires valid projection_sha256 (64 lowercase hex chars), got {projection_sha256!r}"
+            )
+        ready_for_human_review = True
+    else:
+        ready_for_human_review = False
+
+    proposal: Dict[str, Any] = {
+        "catalog_digest": catalog_digest,
+        "contract": CONTRACT_LOCK_PROPOSAL_V2,
+        "environment": {
+            "cmdline_tools_revision": environment["cmdline_tools_revision"].strip(),
+            "emulator_revision": environment["emulator_revision"].strip(),
+            "jdk_major": 17,
+            "runner_image_label": environment["runner_image_label"].strip(),
+            "runner_image_version": environment["runner_image_version"].strip(),
+            "runner_os": environment["runner_os"].strip(),
+        },
+        "freshness": {
+            "fresh_until": fresh_until,
+            "max_age_days": 7,
+            "observed_at": observed_at,
+        },
+        "gpu_evidence": {
+            "candidate_modes": candidate_modes,
+            "emulator_revision": gpu_emu_rev.strip(),
+            "evidence_ready": evidence_ready,
+            "parser_status": parser_status.strip(),
+            "projection_sha256": projection_sha256.strip(),
+            "status": gpu_status.strip(),
+        },
+        "hard_locks": hard_locks,
+        "proposal_state": PROPOSAL_STATE_PENDING,
+        "provenance": {
+            "catalog_commit_sha": provenance["catalog_commit_sha"].strip(),
+            "catalog_run_id": provenance["catalog_run_id"].strip(),
+            "gpu_commit_sha": provenance["gpu_commit_sha"].strip(),
+            "gpu_run_id": provenance["gpu_run_id"].strip(),
+            "runner_image_label": provenance["runner_image_label"].strip(),
+            "runner_image_version": provenance["runner_image_version"].strip(),
+        },
+        "ready_for_human_review": ready_for_human_review,
+    }
+
+    validate_lock_proposal_v2(proposal)
+    return proposal
+
+
+def build_lock_proposal_v2_from_provenance(
+    catalog_digest_payload: Dict[str, Any],
+    catalog_provenance: Dict[str, Any],
+    gpu_evidence: Dict[str, Any],
+    gpu_provenance: Dict[str, Any],
+    gpu_projection: Dict[str, Any],
+) -> Dict[str, Any]:
+    """
+    Synthesizes ALVORADA_LOCK_PROPOSAL_V2 directly from verified catalog and GPU evidence artifacts.
+    Enforces causal freshness: proposal_observed_at = max(catalog_observed_at, gpu_observed_at),
+    fresh_until = proposal_observed_at + 7 days.
+    Enforces cross-run provenance coherence, projection binding, and tripartite emulator alignment.
+    Fails closed if any invariant is violated.
+    """
+    # 1. Verify catalog artifacts
+    validate_catalog_digest_payload(catalog_digest_payload)
+    computed_cat_digest = hash_canonical_json_v1(catalog_digest_payload)
+    validate_catalog_provenance(catalog_provenance)
+    if catalog_provenance["catalog_digest"] != computed_cat_digest:
+        raise ValueError(
+            f"CATALOG_DIGEST_MISMATCH: provenance has {catalog_provenance['catalog_digest']!r}, payload computes {computed_cat_digest!r}"
+        )
+
+    # 2. Verify GPU projection and provenance
+    validate_gpu_projection(gpu_projection)
+    computed_gpu_proj_sha = compute_gpu_projection_sha256(gpu_projection)
+    validate_gpu_provenance(gpu_provenance)
+    if gpu_provenance["gpu_projection_sha256"] != computed_gpu_proj_sha:
+        raise ValueError(
+            f"GPU_PROJECTION_SHA_MISMATCH: provenance has {gpu_provenance['gpu_projection_sha256']!r}, projection computes {computed_gpu_proj_sha!r}"
+        )
+    if gpu_evidence.get("projection_sha256") != computed_gpu_proj_sha:
+        raise ValueError(
+            f"GPU_EVIDENCE_PROJECTION_MISMATCH: evidence has {gpu_evidence.get('projection_sha256')!r}, projection computes {computed_gpu_proj_sha!r}"
+        )
+    if gpu_evidence.get("candidate_modes") != gpu_projection.get("candidate_modes"):
+        raise ValueError(
+            f"GPU_CANDIDATE_MODES_MISMATCH: evidence has {gpu_evidence.get('candidate_modes')!r}, projection has {gpu_projection.get('candidate_modes')!r}"
+        )
+
+    # 3. Cross-run runner coherence
+    if catalog_provenance["runner_image_label"] != gpu_provenance["runner_image_label"]:
+        raise ValueError(
+            f"CROSS_RUN_RUNNER_LABEL_MISMATCH: catalog={catalog_provenance['runner_image_label']!r}, gpu={gpu_provenance['runner_image_label']!r}"
+        )
+    if catalog_provenance["runner_image_version"] != gpu_provenance["runner_image_version"]:
+        raise ValueError(
+            f"CROSS_RUN_RUNNER_VERSION_MISMATCH: catalog={catalog_provenance['runner_image_version']!r}, gpu={gpu_provenance['runner_image_version']!r}"
+        )
+    if catalog_provenance["runner_os"] != gpu_provenance["runner_os"]:
+        raise ValueError(
+            f"CROSS_RUN_RUNNER_OS_MISMATCH: catalog={catalog_provenance['runner_os']!r}, gpu={gpu_provenance['runner_os']!r}"
+        )
+
+    # 4. Tripartite emulator revision alignment
+    hl_emu = next(p["catalog_revision"] for p in catalog_digest_payload["packages"] if p["package_path"] == "emulator")
+    if hl_emu != gpu_provenance["emulator_revision"]:
+        raise ValueError(
+            f"EMULATOR_REVISION_MISMATCH: catalog hard lock has {hl_emu!r}, gpu provenance has {gpu_provenance['emulator_revision']!r}"
+        )
+    if hl_emu != gpu_projection["emulator_revision"]:
+        raise ValueError(
+            f"EMULATOR_REVISION_MISMATCH: catalog hard lock has {hl_emu!r}, gpu projection has {gpu_projection['emulator_revision']!r}"
+        )
+    if hl_emu != gpu_evidence.get("emulator_revision"):
+        raise ValueError(
+            f"EMULATOR_REVISION_MISMATCH: catalog hard lock has {hl_emu!r}, gpu evidence has {gpu_evidence.get('emulator_revision')!r}"
+        )
+
+    # 5. Causal freshness calculation
+    cat_dt = datetime.datetime.strptime(catalog_provenance["observed_at"], "%Y-%m-%dT%H:%M:%SZ")
+    gpu_dt = datetime.datetime.strptime(gpu_provenance["observed_at"], "%Y-%m-%dT%H:%M:%SZ")
+    proposal_dt = max(cat_dt, gpu_dt)
+    proposal_obs = proposal_dt.strftime("%Y-%m-%dT%H:%M:%SZ")
+    fresh_until_dt = proposal_dt + datetime.timedelta(days=7)
+    fresh_until = fresh_until_dt.strftime("%Y-%m-%dT%H:%M:%SZ")
+
+    freshness = {
+        "fresh_until": fresh_until,
+        "max_age_days": 7,
+        "observed_at": proposal_obs,
+    }
+
+    environment = {
+        "cmdline_tools_revision": catalog_provenance["cmdline_tools_revision"],
+        "emulator_revision": hl_emu,
+        "jdk_major": 17,
+        "runner_image_label": catalog_provenance["runner_image_label"],
+        "runner_image_version": catalog_provenance["runner_image_version"],
+        "runner_os": catalog_provenance["runner_os"],
+    }
+
+    provenance = {
+        "catalog_commit_sha": catalog_provenance["repository_commit_sha"],
+        "catalog_run_id": catalog_provenance["run_id"],
+        "gpu_commit_sha": gpu_provenance["repository_commit_sha"],
+        "gpu_run_id": gpu_provenance["run_id"],
+        "runner_image_label": catalog_provenance["runner_image_label"],
+        "runner_image_version": catalog_provenance["runner_image_version"],
+    }
+
+    return create_lock_proposal_v2(
+        catalog_digest_payload=catalog_digest_payload,
+        environment=environment,
+        gpu_evidence=gpu_evidence,
+        freshness=freshness,
+        provenance=provenance,
+    )
+
+
 def compute_lock_proposal_digest(proposal: Dict[str, Any]) -> str:
-    """Computes LOCK_PROPOSAL_DIGEST over validated ALVORADA_LOCK_PROPOSAL_V1 payload."""
+    """Computes LOCK_PROPOSAL_DIGEST over validated ALVORADA_LOCK_PROPOSAL (V1 or V2) payload."""
     validate_lock_proposal(proposal)
     return hash_canonical_json_v1(proposal)
 

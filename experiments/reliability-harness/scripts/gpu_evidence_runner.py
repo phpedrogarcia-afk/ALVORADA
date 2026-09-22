@@ -37,6 +37,7 @@ Orchestrates ephemeral GPU capability discovery in pure Python:
 
 import argparse
 import ctypes.util
+import datetime
 import hashlib
 import os
 import platform
@@ -63,6 +64,14 @@ from catalog_lock_model import (
     ALLOWED_GPU_PARSER_STATUSES,
     ALLOWED_GPU_STATUSES,
     HEX_64_REGEX,
+    CONTRACT_GPU_PROJECTION,
+    create_gpu_projection,
+    compute_gpu_projection_sha256,
+    CONTRACT_GPU_PROVENANCE,
+    create_gpu_provenance,
+    validate_gpu_provenance,
+    COMMIT_SHA_40_REGEX,
+    CATALOG_RUN_ID_REGEX,
 )
 
 
@@ -717,6 +726,17 @@ def run_gpu_evidence_probe(
         parser_status, candidates = parse_gpu_help_output(help_gpu_text)
         overall_status = "PASS_STRICT" if parser_status == "PASS_STRICT" and has_help_gpu else "AMBIGUOUS"
 
+        if len(candidates) >= 1:
+            gpu_projection = create_gpu_projection(candidate_revision, candidates)
+            computed_proj_sha = compute_gpu_projection_sha256(gpu_projection)
+            resolved_proj_sha = projection_sha256 or computed_proj_sha
+        else:
+            gpu_projection = None
+            resolved_proj_sha = projection_sha256 or ("0" * 64)
+
+        if not HEX_64_REGEX.match(resolved_proj_sha):
+            raise ValueError(f"INVALID_PROJECTION_SHA256: {resolved_proj_sha}")
+
         gpu_evidence = build_gpu_evidence(
             candidate_modes=candidates,
             emulator_revision=candidate_revision,
@@ -772,6 +792,17 @@ def run_gpu_evidence_probe(
         print(f"CANDIDATES: {candidates}", file=sys.stderr)
         print("========================================", file=sys.stderr)
 
+        if len(candidates) >= 1:
+            gpu_projection = create_gpu_projection(verified_rev, candidates)
+            computed_proj_sha = compute_gpu_projection_sha256(gpu_projection)
+            resolved_proj_sha = projection_sha256 or computed_proj_sha
+        else:
+            gpu_projection = None
+            resolved_proj_sha = projection_sha256 or ("0" * 64)
+
+        if not HEX_64_REGEX.match(resolved_proj_sha):
+            raise ValueError(f"INVALID_PROJECTION_SHA256: {resolved_proj_sha}")
+
         gpu_evidence = build_gpu_evidence(
             candidate_modes=candidates,
             emulator_revision=verified_rev,
@@ -780,7 +811,55 @@ def run_gpu_evidence_probe(
             status=overall_status,
         )
 
-    # 1. Write gpu-evidence.json (canonical JSON, no trailing newline)
+    # 1. Write gpu-projection.json (canonical JSON, no trailing newline)
+    proj_json_sha256 = None
+    if gpu_projection:
+        proj_bytes = canonicalize_json_v1(gpu_projection)
+        proj_path = os.path.join(output_dir, "gpu-projection.json")
+        with open(proj_path, "wb") as f:
+            f.write(proj_bytes)
+        proj_json_sha256 = hashlib.sha256(proj_bytes).hexdigest()
+
+    # 2. Write gpu-provenance.json (canonical JSON, no trailing newline)
+    prov_json_sha256 = None
+    if gpu_evidence.get("evidence_ready") is True and gpu_projection:
+        prov_commit_sha = env_info["repository_commit_sha"]
+        if not COMMIT_SHA_40_REGEX.match(prov_commit_sha):
+            prov_commit_sha = "0000000000000000000000000000000000000000"
+
+        prov_run_id = env_info["run_id"]
+        if not CATALOG_RUN_ID_REGEX.match(prov_run_id):
+            prov_run_id = "1"
+
+        prov_observed_at = env_info["observed_at"]
+        if prov_observed_at == "UNSET" or not prov_observed_at:
+            prov_observed_at = datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+
+        prov_image_label = env_info["runner_image_label"]
+        if prov_image_label == "UNSET" or not prov_image_label:
+            prov_image_label = "ubuntu24"
+
+        prov_image_version = env_info["runner_image_version"]
+        if prov_image_version == "UNSET" or not prov_image_version:
+            prov_image_version = "20260907.300.1"
+
+        gpu_prov = create_gpu_provenance(
+            repository_commit_sha=prov_commit_sha,
+            run_id=prov_run_id,
+            observed_at=prov_observed_at,
+            runner_os=env_info["runner_os"],
+            runner_image_label=prov_image_label,
+            runner_image_version=prov_image_version,
+            emulator_revision=gpu_evidence["emulator_revision"],
+            gpu_projection_sha256=resolved_proj_sha,
+        )
+        prov_bytes = canonicalize_json_v1(gpu_prov)
+        prov_path = os.path.join(output_dir, "gpu-provenance.json")
+        with open(prov_path, "wb") as f:
+            f.write(prov_bytes)
+        prov_json_sha256 = hashlib.sha256(prov_bytes).hexdigest()
+
+    # 3. Write gpu-evidence.json (canonical JSON, no trailing newline)
     canon_bytes = canonicalize_json_v1(gpu_evidence)
     json_path = os.path.join(output_dir, "gpu-evidence.json")
     with open(json_path, "wb") as f:
@@ -788,7 +867,7 @@ def run_gpu_evidence_probe(
 
     evidence_json_sha256 = hashlib.sha256(canon_bytes).hexdigest()
 
-    # 2. Write gpu-evidence.txt
+    # 4. Write gpu-evidence.txt
     report_text = generate_gpu_evidence_text(
         gpu_evidence=gpu_evidence,
         env_info=env_info,
@@ -802,14 +881,18 @@ def run_gpu_evidence_probe(
 
     report_sha256 = hashlib.sha256(report_bytes).hexdigest()
 
-    # 3. Write checksums.sha256
-    checksums_content = (
-        f"{evidence_json_sha256}  gpu-evidence.json\n"
-        f"{report_sha256}  gpu-evidence.txt\n"
-    )
+    # 5. Write checksums.sha256
+    checksums_lines = []
+    if proj_json_sha256:
+        checksums_lines.append(f"{proj_json_sha256}  gpu-projection.json\n")
+    if prov_json_sha256:
+        checksums_lines.append(f"{prov_json_sha256}  gpu-provenance.json\n")
+    checksums_lines.append(f"{evidence_json_sha256}  gpu-evidence.json\n")
+    checksums_lines.append(f"{report_sha256}  gpu-evidence.txt\n")
+
     checksums_path = os.path.join(output_dir, "checksums.sha256")
     with open(checksums_path, "w", encoding="utf-8", newline="\n") as f:
-        f.write(checksums_content)
+        f.write("".join(checksums_lines))
 
     # Clean any accidental raw files from artifacts directory
     for forbidden in ["raw_gpu_output.txt", "raw_help.txt", "raw_sdk_catalog.txt"]:
@@ -853,8 +936,8 @@ def main() -> None:
     )
     parser.add_argument(
         "--projection-sha256",
-        default="64f3ddd82cc72dacc9146e492345d1f7db8196cff053d7343521021140a7404e",
-        help="SHA-256 of the bound catalog projection",
+        default=None,
+        help="SHA-256 of the bound GPU capability projection (optional override; computed automatically)",
     )
     parser.add_argument(
         "--repo-sha",

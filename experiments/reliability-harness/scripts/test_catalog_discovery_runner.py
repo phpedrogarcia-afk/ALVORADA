@@ -211,14 +211,25 @@ class TestCatalogDiscoveryRunner(unittest.TestCase):
             actual_evid_sha = hashlib.sha256(f.read()).hexdigest()
             self.assertEqual(actual_evid_sha, digests["evidence_sha256"])
 
+        prov_file = os.path.join(out_dir, "catalog-provenance.json")
+        self.assertTrue(os.path.isfile(prov_file))
+
+        with open(prov_file, "rb") as f:
+            prov_data = f.read()
+            actual_prov_sha = hashlib.sha256(prov_data).hexdigest()
+            self.assertEqual(actual_prov_sha, digests["provenance_sha256"])
+
         with open(chk_file, "r", encoding="utf-8") as f:
             chk_lines = f.read().splitlines()
-            self.assertEqual(len(chk_lines), 2)
+            self.assertEqual(len(chk_lines), 3)
             self.assertEqual(
                 chk_lines[0], f"{digests['projection_sha256']}  catalog-projection.json"
             )
             self.assertEqual(
                 chk_lines[1], f"{digests['evidence_sha256']}  catalog-evidence.txt"
+            )
+            self.assertEqual(
+                chk_lines[2], f"{digests['provenance_sha256']}  catalog-provenance.json"
             )
 
         # Check evidence text contains key sections

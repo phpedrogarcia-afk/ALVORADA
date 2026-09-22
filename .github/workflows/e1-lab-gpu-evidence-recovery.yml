@@ -5,17 +5,8 @@ on:
     inputs:
       expected_head_sha:
         description: 'Expected commit SHA on fio/g1-autonomy-recovery'
-        required: false
+        required: true
         type: string
-  push:
-    branches:
-      - fio/g1-autonomy-recovery
-    paths:
-      - '.github/workflows/e1-lab-gpu-evidence-recovery.yml'
-      - 'experiments/reliability-harness/scripts/gpu_evidence_runner.py'
-      - 'experiments/reliability-harness/scripts/test_gpu_evidence_runner.py'
-      - 'experiments/reliability-harness/scripts/catalog_core.py'
-      - 'experiments/reliability-harness/scripts/catalog_lock_model.py'
 
 permissions:
   contents: read
@@ -46,12 +37,16 @@ jobs:
         with:
           ref: ${{ github.sha }}
 
-      - name: Verify checked-out commit matches HEAD
+      - name: Verify checked-out commit matches HEAD and expected SHA
         shell: bash
         run: |
-          checked_out="$(git rev-parse HEAD)"
           expected="${{ inputs.expected_head_sha }}"
-          if [ -n "$expected" ] && [ "$checked_out" != "$expected" ]; then
+          if [ -z "$expected" ]; then
+            echo "ERROR: inputs.expected_head_sha is required but was empty" >&2
+            exit 1
+          fi
+          checked_out="$(git rev-parse HEAD)"
+          if [ "$checked_out" != "$expected" ]; then
             echo "ERROR: Checked-out commit ($checked_out) does not match expected_head_sha ($expected)" >&2
             exit 1
           fi
@@ -61,10 +56,48 @@ jobs:
           fi
           echo "HEAD_VERIFIED=$checked_out"
 
-      - name: Ensure libpulse runtime dependency
+      - name: Causal runtime dependency verification (libpulse)
         shell: bash
         run: |
-          sudo apt-get update && sudo apt-get install -y --no-install-recommends libpulse0 || true
+          python3 -c '
+          import ctypes.util, os, sys, subprocess
+
+          def has_libpulse():
+              return bool(ctypes.util.find_library("pulse") or any(
+                  os.path.exists(p) for p in [
+                      "/usr/lib/x86_64-linux-gnu/libpulse.so.0",
+                      "/usr/lib64/libpulse.so.0",
+                      "/usr/lib/libpulse.so.0",
+                      "/lib/x86_64-linux-gnu/libpulse.so.0",
+                  ]
+              ))
+
+          present_before = has_libpulse()
+          print(f"LIBPULSE_PRESENT_BEFORE={\"YES\" if present_before else \"NO\"}")
+
+          if not present_before:
+              print("LIBPULSE_MUTATION=REQUIRED")
+              cmd_update = ["sudo", "DEBIAN_FRONTEND=noninteractive", "apt-get", "update"]
+              rc1 = subprocess.run(cmd_update).returncode
+              if rc1 != 0:
+                  print("ERROR: apt-get update failed", file=sys.stderr)
+                  sys.exit(rc1)
+              cmd_install = ["sudo", "DEBIAN_FRONTEND=noninteractive", "apt-get", "install", "-y", "--no-install-recommends", "libpulse0"]
+              rc2 = subprocess.run(cmd_install).returncode
+              print(f"LIBPULSE_MUTATION_EXIT_CODE={rc2}")
+              if rc2 != 0:
+                  print("ERROR: apt-get install libpulse0 failed", file=sys.stderr)
+                  sys.exit(rc2)
+              present_after = has_libpulse()
+              print(f"LIBPULSE_PRESENT_AFTER={\"YES\" if present_after else \"NO\"}")
+              if not present_after:
+                  print("ERROR: libpulse.so.0 still absent after mutation", file=sys.stderr)
+                  sys.exit(1)
+          else:
+              print("LIBPULSE_MUTATION=NONE")
+              print("LIBPULSE_MUTATION_EXIT_CODE=0")
+              print("LIBPULSE_PRESENT_AFTER=YES")
+          '
 
       - name: Pre-execution automated test suite
         shell: bash
@@ -81,8 +114,7 @@ jobs:
             --repo-sha "${{ github.sha }}" \
             --run-id "${{ github.run_id }}" \
             --observed-at "$obs_time" \
-            --candidate-revision "37.1.11" \
-            --projection-sha256 "64f3ddd82cc72dacc9146e492345d1f7db8196cff053d7343521021140a7404e"
+            --candidate-revision "37.1.11"
 
       - name: Verify artifact checksums
         shell: bash

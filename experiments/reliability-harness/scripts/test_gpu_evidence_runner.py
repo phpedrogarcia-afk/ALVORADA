@@ -9,8 +9,11 @@ import hashlib
 import json
 import os
 import shutil
+import sys
 import tempfile
 import unittest
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 from catalog_core import canonicalize_json_v1
 from catalog_lock_model import (
@@ -468,9 +471,13 @@ Valid gpu modes are:
         self.assertEqual(gpu_ev["status"], "PASS_STRICT")
 
         # Check files exist
+        proj_path = os.path.join(self.out_dir, "gpu-projection.json")
+        prov_path = os.path.join(self.out_dir, "gpu-provenance.json")
         json_path = os.path.join(self.out_dir, "gpu-evidence.json")
         txt_path = os.path.join(self.out_dir, "gpu-evidence.txt")
         chk_path = os.path.join(self.out_dir, "checksums.sha256")
+        self.assertTrue(os.path.isfile(proj_path))
+        self.assertTrue(os.path.isfile(prov_path))
         self.assertTrue(os.path.isfile(json_path))
         self.assertTrue(os.path.isfile(txt_path))
         self.assertTrue(os.path.isfile(chk_path))
@@ -489,9 +496,33 @@ Valid gpu modes are:
         # Check checksums file content
         with open(chk_path, "r", encoding="utf-8") as f:
             chk_lines = f.readlines()
-        self.assertEqual(len(chk_lines), 2)
-        self.assertTrue(chk_lines[0].startswith(disk_sha))
-        self.assertTrue(chk_lines[0].endswith("gpu-evidence.json\n"))
+        self.assertEqual(len(chk_lines), 4)
+        self.assertTrue(any("gpu-projection.json" in l for l in chk_lines))
+        self.assertTrue(any("gpu-provenance.json" in l for l in chk_lines))
+        self.assertTrue(any("gpu-evidence.json" in l for l in chk_lines))
+        self.assertTrue(any("gpu-evidence.txt" in l for l in chk_lines))
+
+    def test_offline_orchestration_computes_gpu_projection_automatically(self):
+        """Verifies that projection_sha256 defaults to pure ALVORADA_GPU_PROJECTION_V1 hash."""
+        exit_code, gpu_ev, ev_sha = run_gpu_evidence_probe(
+            output_dir=self.out_dir,
+            candidate_revision="37.1.11",
+            projection_sha256=None,  # Automatic computation
+            repo_sha="8570a837852a2ab669092ac3940086a1fdc1cb81",
+            run_id="35676154497",
+            observed_at="2026-09-22T01:32:53Z",
+            raw_help_file=self.raw_help_file,
+            raw_help_gpu_file=self.raw_help_gpu_file,
+        )
+        self.assertEqual(exit_code, 0)
+        proj_path = os.path.join(self.out_dir, "gpu-projection.json")
+        with open(proj_path, "r", encoding="utf-8") as f:
+            proj_data = json.load(f)
+
+        self.assertEqual(proj_data["contract"], "ALVORADA_GPU_PROJECTION_V1")
+        self.assertEqual(proj_data["emulator_revision"], "37.1.11")
+        proj_sha = hashlib.sha256(canonicalize_json_v1(proj_data)).hexdigest()
+        self.assertEqual(gpu_ev["projection_sha256"], proj_sha)
 
 
 if __name__ == "__main__":
