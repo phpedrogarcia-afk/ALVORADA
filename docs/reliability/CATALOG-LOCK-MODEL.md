@@ -1,6 +1,6 @@
 # THREE-DIGEST CATALOG LOCK MODEL & IMMUTABLE PROPOSAL CONTRACT
 
-**Status:** RECOVERY-G1-002-R1 RECOVERY CANDIDATE SPECIFICATION<br>
+**Status:** RECOVERY-G1-002-R2 RECOVERY CANDIDATE SPECIFICATION<br>
 **Contract Suite:** `ALVORADA_CATALOG_LOCK_MODEL_V1`<br>
 **Classification:** ARCHITECTURAL INTEGRITY & GOVERNANCE CONTRACT
 
@@ -69,6 +69,7 @@ $$\mathbf{CATALOG\_DIGEST} \neq \mathbf{LOCK\_PROPOSAL\_DIGEST} \neq \mathbf{LOC
 ### B. LOCK_PROPOSAL_DIGEST (`ALVORADA_LOCK_PROPOSAL_V1`)
 - **Purpose:** Immutably freezes the complete discovery observation produced by automated CI probes.
 - **Immutability Invariant:** The proposal is strictly immutable once created. It has **NO** mutable boolean flags (such as `lock_approved = YES/NO`). Its state is permanently `proposal_state = "PENDING_HUMAN_REVIEW"`.
+- **Closed Semantic Builder Inputs:** `create_lock_proposal()` enforces closed schemas on all input dicts (`environment`, `provenance`, `freshness`, `gpu_evidence`). Principle: **NO SILENTLY UNBOUND SEMANTIC INPUT**. Callers cannot supply extra fields that would be silently ignored or omitted from the digest.
 - **Payload Contents:**
   - `catalog_digest`: Binds the exact stable catalog payload.
   - `hard_locks`: Revisions derived strictly from the catalog payload (cannot be independently supplied).
@@ -77,6 +78,9 @@ $$\mathbf{CATALOG\_DIGEST} \neq \mathbf{LOCK\_PROPOSAL\_DIGEST} \neq \mathbf{LOC
   - `freshness`: `observed_at`, `fresh_until` (`observed_at + 7 days`), and `max_age_days: 7`.
   - `provenance`: Git commit SHA, GitHub Actions run ID, runner image labels.
   - `ready_for_human_review`: Explicit boolean flag indicating structural readiness for human evaluation.
+- **Provenance Structural Format Validation:**
+  - `repository_commit_sha`: Strictly 40 lowercase hexadecimal characters (`^[0-9a-f]{40}$`). Rejects short SHAs, uppercase SHAs, non-hex strings, whitespace, URLs, and branch names.
+  - `catalog_run_id`: Strictly positive decimal integer string (`^[1-9][0-9]*$`). Rejects zero, negative numbers, decimals, and non-digit characters.
 - **Tripartite Revision Binding:**
   $$\text{gpu\_evidence.emulator\_revision} == \text{environment.emulator\_revision} == \text{hard\_locks[\"emulator\"].revision}$$
 - **Runner Coherence:**
@@ -103,18 +107,22 @@ $$\mathbf{CATALOG\_DIGEST} \neq \mathbf{LOCK\_PROPOSAL\_DIGEST} \neq \mathbf{LOC
 
 ## 3. Trust Boundaries and Governance Contracts
 
-### A. Dual-Window Freshness Enforcement
+### A. Dual-Window Freshness & Temporal Causality Enforcement
 Freshness verification does not rely on implicit system clocks (`datetime.now()` is strictly prohibited). An evaluation requires an explicit, mandatory `evaluation_time_utc` parameter.
 
-To be valid, two distinct time windows must hold simultaneously:
+To be valid, temporal causality and two distinct time windows must hold simultaneously:
 1. **Decision Time Validity (`REVIEW_TIME_VALID`):**
    $$\text{observed\_at} \le \text{reviewed\_at} \le \text{fresh\_until}$$
 2. **Evaluation Time Validity (`EVALUATION_TIME_VALID`):**
    $$\text{observed\_at} \le \text{evaluation\_time\_utc} \le \text{fresh\_until}$$
+3. **Temporal Causality (`DECISION_PRECEDES_OR_EQUALS_EVALUATION`):**
+   $$\text{reviewed\_at} \le \text{evaluation\_time\_utc}$$
 
-$$\mathbf{FRESHNESS\_VALID} = \mathbf{REVIEW\_TIME\_VALID} \land \mathbf{EVALUATION\_TIME\_VALID}$$
+$$\mathbf{FRESHNESS\_VALID} = \mathbf{REVIEW\_TIME\_VALID} \land \mathbf{EVALUATION\_TIME\_VALID} \land \mathbf{DECISION\_PRECEDES\_OR\_EQUALS\_EVALUATION}$$
 
-This dual-window contract prevents backdated revival: an expired proposal cannot be authorized today using a historical decision timestamp.
+This contract prevents two critical attacks:
+- **Backdated Revival:** An expired proposal cannot be authorized today using a historical decision timestamp.
+- **Future Decision:** A decision recorded with a timestamp in the future relative to the evaluation time is rejected immediately.
 
 ### B. `ready_for_human_review` != Approval
 `ready_for_human_review` is an informational readiness indicator, not an approval.

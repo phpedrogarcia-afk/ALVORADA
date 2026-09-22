@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 ALVORADA — Three-Digest Catalog Lock Model & Immutable Lock Proposal Contract
-Contract Version: RECOVERY-G1-002-R1
+Contract Version: RECOVERY-G1-002-R2
 
 Implements:
 1. CATALOG_DIGEST: Cryptographic identity of pure stable catalog channel state
@@ -16,9 +16,11 @@ Implements:
    NOTE: Human authority is strictly external. The existence of a valid decision JSON
    does not constitute proof of human identity within the library.
 5. Invariants and trust-boundary validations:
-   - Dual-window freshness enforcement (reviewed_at and explicit evaluation_time_utc).
+   - Dual-window freshness & temporal causality (observed_at <= reviewed_at <= evaluation_time_utc <= fresh_until).
    - Strict fail-closed GPU evidence with lowercase 64-hex projection_sha256 and emulator binding.
    - Closed top-level schema for HumanDecision requiring non-empty review_context.
+   - Closed semantic builder input schemas (environment, provenance, freshness, gpu_evidence).
+   - Provenance structural format validation (40-char lowercase hex commit SHA, positive decimal run ID).
    - Re-validation of catalog digest payload before use in proposals.
    - Environment and provenance runner image label/version coherence.
    - Explicit ready_for_human_review flag in proposal.
@@ -53,7 +55,10 @@ MAX_FRESHNESS_DAYS = 7
 
 ALLOWED_GPU_STATUSES = {"PASS_STRICT", "UNAVAILABLE", "AMBIGUOUS", "FAILED"}
 ALLOWED_GPU_PARSER_STATUSES = {"PASS_STRICT", "UNAVAILABLE", "AMBIGUOUS", "FAILED"}
+
 HEX_64_REGEX = re.compile(r"^[0-9a-f]{64}$")
+COMMIT_SHA_40_REGEX = re.compile(r"^[0-9a-f]{40}$")
+CATALOG_RUN_ID_REGEX = re.compile(r"^[1-9][0-9]*$")
 
 ALLOWED_HUMAN_DECISION_KEYS = {
     "catalog_digest",
@@ -75,6 +80,37 @@ ALLOWED_PROPOSAL_KEYS = {
     "proposal_state",
     "provenance",
     "ready_for_human_review",
+}
+
+ALLOWED_ENVIRONMENT_KEYS = {
+    "cmdline_tools_revision",
+    "emulator_revision",
+    "jdk_major",
+    "runner_image_label",
+    "runner_image_version",
+    "runner_os",
+}
+
+ALLOWED_PROVENANCE_KEYS = {
+    "catalog_run_id",
+    "repository_commit_sha",
+    "runner_image_label",
+    "runner_image_version",
+}
+
+ALLOWED_FRESHNESS_KEYS = {
+    "fresh_until",
+    "max_age_days",
+    "observed_at",
+}
+
+ALLOWED_GPU_EVIDENCE_KEYS = {
+    "candidate_modes",
+    "emulator_revision",
+    "evidence_ready",
+    "parser_status",
+    "projection_sha256",
+    "status",
 }
 
 
@@ -352,15 +388,7 @@ def validate_lock_proposal(proposal: Any) -> None:
         raise TypeError("INVALID_LOCK_PROPOSAL: environment must be a dictionary")
     _validate_no_local_paths(environment, "environment")
 
-    allowed_env_keys = {
-        "cmdline_tools_revision",
-        "emulator_revision",
-        "jdk_major",
-        "runner_image_label",
-        "runner_image_version",
-        "runner_os",
-    }
-    if set(environment.keys()) != allowed_env_keys:
+    if set(environment.keys()) != ALLOWED_ENVIRONMENT_KEYS:
         raise ValueError("INVALID_LOCK_PROPOSAL: environment keys mismatch")
 
     jdk_major = environment.get("jdk_major")
@@ -378,19 +406,22 @@ def validate_lock_proposal(proposal: Any) -> None:
         raise TypeError("INVALID_LOCK_PROPOSAL: provenance must be a dictionary")
     _validate_no_local_paths(provenance, "provenance")
 
-    allowed_prov_keys = {
-        "catalog_run_id",
-        "repository_commit_sha",
-        "runner_image_label",
-        "runner_image_version",
-    }
-    if set(provenance.keys()) != allowed_prov_keys:
+    if set(provenance.keys()) != ALLOWED_PROVENANCE_KEYS:
         raise ValueError("INVALID_LOCK_PROPOSAL: provenance keys mismatch")
 
-    for k in allowed_prov_keys:
+    for k in ALLOWED_PROVENANCE_KEYS:
         v = provenance.get(k)
         if not isinstance(v, str) or not v.strip():
             raise ValueError(f"INVALID_LOCK_PROPOSAL: provenance.{k} must be a non-empty string")
+
+    if not COMMIT_SHA_40_REGEX.match(provenance["repository_commit_sha"]):
+        raise ValueError(
+            "INVALID_LOCK_PROPOSAL: provenance.repository_commit_sha must be exactly 40 lowercase hex characters"
+        )
+    if not CATALOG_RUN_ID_REGEX.match(provenance["catalog_run_id"]):
+        raise ValueError(
+            "INVALID_LOCK_PROPOSAL: provenance.catalog_run_id must be a positive decimal integer string"
+        )
 
     # Environment / Provenance coherence
     if environment["runner_image_label"].strip() != provenance["runner_image_label"].strip():
@@ -403,8 +434,7 @@ def validate_lock_proposal(proposal: Any) -> None:
     if not isinstance(freshness, dict):
         raise TypeError("INVALID_LOCK_PROPOSAL: freshness must be a dictionary")
 
-    allowed_fresh_keys = {"fresh_until", "max_age_days", "observed_at"}
-    if set(freshness.keys()) != allowed_fresh_keys:
+    if set(freshness.keys()) != ALLOWED_FRESHNESS_KEYS:
         raise ValueError("INVALID_LOCK_PROPOSAL: freshness keys mismatch")
 
     observed_at = freshness.get("observed_at")
@@ -437,15 +467,7 @@ def validate_lock_proposal(proposal: Any) -> None:
         if prohibited in gpu_evidence:
             raise ValueError(f"GPU_SELECTION_PROHIBITED_IN_PROPOSAL: {prohibited!r} found in gpu_evidence")
 
-    allowed_gpu_keys = {
-        "candidate_modes",
-        "emulator_revision",
-        "evidence_ready",
-        "parser_status",
-        "projection_sha256",
-        "status",
-    }
-    if set(gpu_evidence.keys()) != allowed_gpu_keys:
+    if set(gpu_evidence.keys()) != ALLOWED_GPU_EVIDENCE_KEYS:
         raise ValueError("INVALID_LOCK_PROPOSAL: gpu_evidence keys mismatch")
 
     gpu_status = gpu_evidence.get("status")
@@ -516,7 +538,7 @@ def create_lock_proposal(
 ) -> Dict[str, Any]:
     """
     Constructs an immutable ALVORADA_LOCK_PROPOSAL_V1.
-    Fails closed if any contractual invariants are violated.
+    Fails closed if any contractual invariants or extra semantic inputs are encountered.
     """
     # 1. Re-validate catalog digest payload directly (no trust-by-call-chain)
     validate_catalog_digest_payload(catalog_digest_payload)
@@ -532,22 +554,17 @@ def create_lock_proposal(
     ]
     hl_map = {hl["package_path"]: hl["revision"] for hl in hard_locks}
 
-    # 3. Validate environment
+    # 3. Validate environment (strictly closed schema: NO SILENTLY UNBOUND SEMANTIC INPUT)
     if not isinstance(environment, dict):
         raise TypeError("environment must be a dictionary")
     _validate_no_local_paths(environment, "environment")
 
-    allowed_env_keys = {
-        "cmdline_tools_revision",
-        "emulator_revision",
-        "jdk_major",
-        "runner_image_label",
-        "runner_image_version",
-        "runner_os",
-    }
-    for req in allowed_env_keys:
-        if req not in environment:
-            raise ValueError(f"Missing mandatory environment field: {req!r}")
+    if set(environment.keys()) != ALLOWED_ENVIRONMENT_KEYS:
+        extra = set(environment.keys()) - ALLOWED_ENVIRONMENT_KEYS
+        missing = ALLOWED_ENVIRONMENT_KEYS - set(environment.keys())
+        raise ValueError(
+            f"INVALID_ENVIRONMENT: Unexpected keys {sorted(extra)} or missing keys {sorted(missing)}"
+        )
 
     jdk_major = environment["jdk_major"]
     if not isinstance(jdk_major, int) or jdk_major != 17 or isinstance(jdk_major, bool):
@@ -570,25 +587,34 @@ def create_lock_proposal(
             f"environment.emulator_revision ({environment['emulator_revision']!r}) != hard_locks['emulator'] ({hl_map['emulator']!r})"
         )
 
-    # 4. Validate provenance
+    # 4. Validate provenance (strictly closed schema: NO SILENTLY UNBOUND SEMANTIC INPUT)
     if not isinstance(provenance, dict):
         raise TypeError("provenance must be a dictionary")
     _validate_no_local_paths(provenance, "provenance")
 
-    allowed_prov_keys = {
-        "catalog_run_id",
-        "repository_commit_sha",
-        "runner_image_label",
-        "runner_image_version",
-    }
-    for req in allowed_prov_keys:
-        if req not in provenance:
-            raise ValueError(f"Missing mandatory provenance field: {req!r}")
+    if set(provenance.keys()) != ALLOWED_PROVENANCE_KEYS:
+        extra = set(provenance.keys()) - ALLOWED_PROVENANCE_KEYS
+        missing = ALLOWED_PROVENANCE_KEYS - set(provenance.keys())
+        raise ValueError(
+            f"INVALID_PROVENANCE: Unexpected keys {sorted(extra)} or missing keys {sorted(missing)}"
+        )
 
-    for req_field in allowed_prov_keys:
+    for req_field in ALLOWED_PROVENANCE_KEYS:
         val = provenance[req_field]
         if not isinstance(val, str) or not val.strip():
             raise ValueError(f"Missing or invalid provenance field: {req_field}")
+
+    repo_sha = provenance["repository_commit_sha"]
+    if not isinstance(repo_sha, str) or not COMMIT_SHA_40_REGEX.match(repo_sha):
+        raise ValueError(
+            f"provenance.repository_commit_sha must be exactly 40 lowercase hex characters, got {repo_sha!r}"
+        )
+
+    run_id = provenance["catalog_run_id"]
+    if not isinstance(run_id, str) or not CATALOG_RUN_ID_REGEX.match(run_id):
+        raise ValueError(
+            f"provenance.catalog_run_id must be a positive decimal integer string without signs, decimals, or spaces, got {run_id!r}"
+        )
 
     # Environment / Provenance runner image coherence
     if environment["runner_image_label"].strip() != provenance["runner_image_label"].strip():
@@ -600,13 +626,16 @@ def create_lock_proposal(
             f"runner_image_version mismatch: environment ({environment['runner_image_version']!r}) != provenance ({provenance['runner_image_version']!r})"
         )
 
-    # 5. Validate freshness
+    # 5. Validate freshness (strictly closed schema: NO SILENTLY UNBOUND SEMANTIC INPUT)
     if not isinstance(freshness, dict):
         raise TypeError("freshness must be a dictionary")
 
-    for req in ["observed_at", "fresh_until", "max_age_days"]:
-        if req not in freshness:
-            raise ValueError(f"Missing mandatory freshness field: {req!r}")
+    if set(freshness.keys()) != ALLOWED_FRESHNESS_KEYS:
+        extra = set(freshness.keys()) - ALLOWED_FRESHNESS_KEYS
+        missing = ALLOWED_FRESHNESS_KEYS - set(freshness.keys())
+        raise ValueError(
+            f"INVALID_FRESHNESS: Unexpected keys {sorted(extra)} or missing keys {sorted(missing)}"
+        )
 
     observed_at = freshness["observed_at"]
     fresh_until = freshness["fresh_until"]
@@ -632,7 +661,7 @@ def create_lock_proposal(
             f"fresh_until must be exactly {MAX_FRESHNESS_DAYS} days after observed_at, got delta {delta}"
         )
 
-    # 6. Validate GPU evidence (strictly NO GPU selection)
+    # 6. Validate GPU evidence (strictly closed schema: NO SILENTLY UNBOUND SEMANTIC INPUT)
     if not isinstance(gpu_evidence, dict):
         raise TypeError("gpu_evidence must be a dictionary")
     _validate_no_local_paths(gpu_evidence, "gpu_evidence")
@@ -643,17 +672,12 @@ def create_lock_proposal(
                 f"GPU_SELECTION_PROHIBITED_IN_PROPOSAL: {prohibited!r} found in gpu_evidence"
             )
 
-    allowed_gpu_keys = {
-        "candidate_modes",
-        "emulator_revision",
-        "evidence_ready",
-        "parser_status",
-        "projection_sha256",
-        "status",
-    }
-    for req in allowed_gpu_keys:
-        if req not in gpu_evidence:
-            raise ValueError(f"Missing mandatory gpu_evidence field: {req!r}")
+    if set(gpu_evidence.keys()) != ALLOWED_GPU_EVIDENCE_KEYS:
+        extra = set(gpu_evidence.keys()) - ALLOWED_GPU_EVIDENCE_KEYS
+        missing = ALLOWED_GPU_EVIDENCE_KEYS - set(gpu_evidence.keys())
+        raise ValueError(
+            f"INVALID_GPU_EVIDENCE: Unexpected keys {sorted(extra)} or missing keys {sorted(missing)}"
+        )
 
     gpu_status = gpu_evidence["status"]
     if gpu_status not in ALLOWED_GPU_STATUSES:
@@ -733,8 +757,8 @@ def create_lock_proposal(
         "hard_locks": hard_locks,
         "proposal_state": PROPOSAL_STATE_PENDING,
         "provenance": {
-            "catalog_run_id": provenance["catalog_run_id"].strip(),
-            "repository_commit_sha": provenance["repository_commit_sha"].strip(),
+            "catalog_run_id": run_id,
+            "repository_commit_sha": repo_sha,
             "runner_image_label": provenance["runner_image_label"].strip(),
             "runner_image_version": provenance["runner_image_version"].strip(),
         },
@@ -764,7 +788,7 @@ def verify_human_decision(
     Structurally verifies an externally supplied HumanDecision object against an immutable proposal.
     IMPORTANT:
     The existence of a valid decision object DOES NOT prove human identity or authorization.
-    This function verifies schema, digests, candidate match, and dual-window freshness only.
+    This function verifies schema, digests, candidate match, dual-window freshness, and temporal causality.
     Always returns report with HUMAN_AUTHORITY_EXTERNALLY_REQUIRED = True.
     """
     errors: List[str] = []
@@ -775,6 +799,7 @@ def verify_human_decision(
         "SELECTED_GPU_VALID": False,
         "REVIEW_TIME_VALID": False,
         "EVALUATION_TIME_VALID": False,
+        "DECISION_PRECEDES_OR_EQUALS_EVALUATION": False,
         "FRESHNESS_VALID": False,
     }
 
@@ -846,12 +871,15 @@ def verify_human_decision(
         else:
             report["SELECTED_GPU_VALID"] = True
 
-    # 3. Dual-window Freshness validation
+    # 3. Dual-window Freshness and Temporal Causality validation
     observed_at = proposal.get("freshness", {}).get("observed_at")
     fresh_until = proposal.get("freshness", {}).get("fresh_until")
 
     dt_obs = datetime.datetime.strptime(observed_at, "%Y-%m-%dT%H:%M:%SZ")
     dt_fresh = datetime.datetime.strptime(fresh_until, "%Y-%m-%dT%H:%M:%SZ")
+
+    dt_review: Optional[datetime.datetime] = None
+    dt_eval: Optional[datetime.datetime] = None
 
     # A. reviewed_at
     reviewed_at = decision_obj.get("reviewed_at")
@@ -886,7 +914,20 @@ def verify_human_decision(
         except Exception as e:
             errors.append(f"Invalid evaluation_time_utc timestamp: {e}")
 
-    report["FRESHNESS_VALID"] = report["REVIEW_TIME_VALID"] and report["EVALUATION_TIME_VALID"]
+    # C. Temporal Causality: reviewed_at <= evaluation_time_utc
+    if dt_review is not None and dt_eval is not None:
+        if dt_review > dt_eval:
+            errors.append(
+                f"Decision in future: reviewed_at ({reviewed_at}) > evaluation_time_utc ({evaluation_time_utc})"
+            )
+        else:
+            report["DECISION_PRECEDES_OR_EQUALS_EVALUATION"] = True
+
+    report["FRESHNESS_VALID"] = (
+        report["REVIEW_TIME_VALID"]
+        and report["EVALUATION_TIME_VALID"]
+        and report["DECISION_PRECEDES_OR_EQUALS_EVALUATION"]
+    )
     report["SCHEMA_VALID"] = (len(errors) == 0)
 
     is_valid = (

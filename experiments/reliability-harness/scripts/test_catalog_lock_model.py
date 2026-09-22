@@ -1,19 +1,21 @@
 #!/usr/bin/env python3
 """
 ALVORADA — Comprehensive Unit & Mutation Test Suite for Three-Digest Lock Model
-Contract Version: RECOVERY-G1-002-R1
+Contract Version: RECOVERY-G1-002-R2
 
 Validates:
 1. CATALOG_DIGEST, LOCK_PROPOSAL_DIGEST, and LOCK_DIGEST three-way separation.
 2. Pre-computed static SHA-256 fixtures verified with independent second-path byte builder.
 3. Strict payload scoping and schema validation (no leakage of local paths, closed HumanDecision schema).
-4. Dual-window freshness enforcement (reviewed_at and evaluation_time_utc, backdated decision cannot revive expired proposal).
+4. Dual-window freshness & temporal causality (observed_at <= reviewed_at <= evaluation_time_utc <= fresh_until).
 5. Strict fail-closed GPU evidence (missing fields, regex-validated lowercase 64-hex projection hash, status checks, emulator revision binding).
 6. Direct catalog payload bypass closure (validate_catalog_digest_payload called on external payloads).
-7. Environment and provenance coherence (runner_image_label and runner_image_version).
-8. ready_for_human_review boolean flag in proposal payload (ready_for_human_review != approval).
-9. Mutation test matrix (proves sensitivity to changes and isolation of review_context from lock payload).
-10. Human authority is external (HUMAN_AUTHORITY_EXTERNALLY_REQUIRED=True, LOCK_CANDIDATE_COMPUTED).
+7. Provenance structural format validation (40-char lowercase hex commit SHA, positive decimal run ID).
+8. Closed semantic builder input schemas (environment, provenance, freshness, gpu_evidence reject extra fields).
+9. Environment and provenance coherence (runner_image_label and runner_image_version).
+10. ready_for_human_review boolean flag in proposal payload (ready_for_human_review != approval).
+11. Mutation test matrix (proves sensitivity to changes and isolation of review_context from lock payload).
+12. Human authority is external (HUMAN_AUTHORITY_EXTERNALLY_REQUIRED=True, LOCK_CANDIDATE_COMPUTED).
 """
 
 import copy
@@ -220,8 +222,8 @@ class TestThreeDigestModel(unittest.TestCase):
         )
 
 
-class TestDualFreshness(unittest.TestCase):
-    """Validates dual-window freshness enforcement: reviewed_at and evaluation_time_utc."""
+class TestDualFreshnessAndTemporalCausality(unittest.TestCase):
+    """Validates dual-window freshness enforcement and temporal causality (reviewed_at <= evaluation_time_utc)."""
 
     def setUp(self):
         self.tester = TestThreeDigestModel()
@@ -245,15 +247,53 @@ class TestDualFreshness(unittest.TestCase):
             "selected_gpu": "swiftshader_indirect",
         }
 
-    def test_both_in_range_passes(self):
-        """reviewed_at in range and evaluation_time in range passes."""
+    def test_reviewed_at_less_than_evaluation_time_passes(self):
+        """reviewed_at < evaluation_time passes with all freshness flags true."""
         valid, errors, report = verify_human_decision(
-            self.base_decision, self.proposal, evaluation_time_utc="2026-09-22T10:00:00Z"
+            self.base_decision, self.proposal, evaluation_time_utc="2026-09-21T15:30:00Z"
         )
         self.assertTrue(valid)
         self.assertTrue(report["REVIEW_TIME_VALID"])
         self.assertTrue(report["EVALUATION_TIME_VALID"])
+        self.assertTrue(report["DECISION_PRECEDES_OR_EQUALS_EVALUATION"])
         self.assertTrue(report["FRESHNESS_VALID"])
+
+    def test_reviewed_at_equals_evaluation_time_passes(self):
+        """reviewed_at == evaluation_time passes with all freshness flags true."""
+        valid, errors, report = verify_human_decision(
+            self.base_decision, self.proposal, evaluation_time_utc="2026-09-21T15:00:00Z"
+        )
+        self.assertTrue(valid)
+        self.assertTrue(report["REVIEW_TIME_VALID"])
+        self.assertTrue(report["EVALUATION_TIME_VALID"])
+        self.assertTrue(report["DECISION_PRECEDES_OR_EQUALS_EVALUATION"])
+        self.assertTrue(report["FRESHNESS_VALID"])
+
+    def test_reviewed_at_greater_than_evaluation_time_fails(self):
+        """reviewed_at > evaluation_time fails closed (decision in future relative to evaluation)."""
+        valid, errors, report = verify_human_decision(
+            self.base_decision, self.proposal, evaluation_time_utc="2026-09-21T14:00:00Z"
+        )
+        self.assertFalse(valid)
+        self.assertTrue(report["REVIEW_TIME_VALID"])
+        self.assertTrue(report["EVALUATION_TIME_VALID"])
+        self.assertFalse(report["DECISION_PRECEDES_OR_EQUALS_EVALUATION"])
+        self.assertFalse(report["FRESHNESS_VALID"])
+        self.assertTrue(any("Decision in future" in e for e in errors))
+
+    def test_future_review_within_freshness_window_fails(self):
+        """Both timestamps within [observed_at, fresh_until], but review in future fails closed."""
+        dec = copy.deepcopy(self.base_decision)
+        dec["reviewed_at"] = "2026-09-25T12:00:00Z"  # Valid vs fresh_until 2026-09-27
+        # Evaluation is earlier: 2026-09-23T12:00:00Z
+        valid, errors, report = verify_human_decision(
+            dec, self.proposal, evaluation_time_utc="2026-09-23T12:00:00Z"
+        )
+        self.assertFalse(valid)
+        self.assertTrue(report["REVIEW_TIME_VALID"])
+        self.assertTrue(report["EVALUATION_TIME_VALID"])
+        self.assertFalse(report["DECISION_PRECEDES_OR_EQUALS_EVALUATION"])
+        self.assertFalse(report["FRESHNESS_VALID"])
 
     def test_reviewed_at_expired_fails(self):
         """reviewed_at > fresh_until fails closed even if evaluation_time is in range."""
@@ -313,6 +353,130 @@ class TestDualFreshness(unittest.TestCase):
         )
         self.assertFalse(valid)
         self.assertFalse(report["EVALUATION_TIME_VALID"])
+
+
+class TestProvenanceStructuralValidation(unittest.TestCase):
+    """Validates structural formatting of repository_commit_sha and catalog_run_id."""
+
+    def setUp(self):
+        self.tester = TestThreeDigestModel()
+        self.tester.setUp()
+        _, self.cat_payload = compute_catalog_digest(self.tester.sample_projection)
+
+    def test_invalid_repository_commit_sha_fails_closed(self):
+        """Rejects short SHA, uppercase SHA, non-hex, whitespace, URL, and branch names."""
+        bad_shas = [
+            "43018b1",                                                                  # short SHA
+            "43018B1F9B14CB9E580D2157E6CB623EE18DE0D1",                                  # uppercase SHA
+            "43018b1f9b14cb9e580d2157e6cb623ee18de0zz",                                  # non-hex chars
+            "",                                                                           # empty
+            " 43018b1f9b14cb9e580d2157e6cb623ee18de0d1 ",                                # leading/trailing whitespace
+            "https://github.com/phpedrogarcia-afk/ALVORADA/commit/43018b1",               # URL
+            "fio/g1-autonomy-recovery",                                                   # branch name
+            "43018b1f9b14cb9e580d2157e6cb623ee18de0d1a",                                 # 41 chars
+        ]
+        for bad_sha in bad_shas:
+            prov = copy.deepcopy(self.tester.sample_provenance)
+            prov["repository_commit_sha"] = bad_sha
+            with self.subTest(bad_sha=bad_sha):
+                with self.assertRaises(ValueError):
+                    create_lock_proposal(
+                        self.cat_payload,
+                        self.tester.sample_env,
+                        self.tester.sample_gpu,
+                        self.tester.sample_freshness,
+                        prov,
+                    )
+
+    def test_invalid_catalog_run_id_fails_closed(self):
+        """Rejects non-positive decimals, signs, decimals, spaces, and strings."""
+        bad_run_ids = [
+            "0",
+            "-1",
+            "run-123",
+            "123.0",
+            " 123 ",
+            "abc",
+            "",
+            "0123",  # leading zero rejected
+        ]
+        for bad_id in bad_run_ids:
+            prov = copy.deepcopy(self.tester.sample_provenance)
+            prov["catalog_run_id"] = bad_id
+            with self.subTest(bad_id=bad_id):
+                with self.assertRaises(ValueError):
+                    create_lock_proposal(
+                        self.cat_payload,
+                        self.tester.sample_env,
+                        self.tester.sample_gpu,
+                        self.tester.sample_freshness,
+                        prov,
+                    )
+
+
+class TestClosedSemanticBuilderInputs(unittest.TestCase):
+    """Validates that create_lock_proposal rejects unexpected fields in semantic inputs (no silently unbound input)."""
+
+    def setUp(self):
+        self.tester = TestThreeDigestModel()
+        self.tester.setUp()
+        _, self.cat_payload = compute_catalog_digest(self.tester.sample_projection)
+
+    def test_extra_environment_field_fails_closed(self):
+        """Unexpected key in environment fails closed."""
+        env = copy.deepcopy(self.tester.sample_env)
+        env["extra_semantic_field"] = "unbound_value"
+        with self.assertRaises(ValueError) as ctx:
+            create_lock_proposal(
+                self.cat_payload,
+                env,
+                self.tester.sample_gpu,
+                self.tester.sample_freshness,
+                self.tester.sample_provenance,
+            )
+        self.assertIn("INVALID_ENVIRONMENT", str(ctx.exception))
+
+    def test_extra_provenance_field_fails_closed(self):
+        """Unexpected key in provenance fails closed."""
+        prov = copy.deepcopy(self.tester.sample_provenance)
+        prov["ci_workflow_name"] = "e1-lab-catalog-discovery.yml"
+        with self.assertRaises(ValueError) as ctx:
+            create_lock_proposal(
+                self.cat_payload,
+                self.tester.sample_env,
+                self.tester.sample_gpu,
+                self.tester.sample_freshness,
+                prov,
+            )
+        self.assertIn("INVALID_PROVENANCE", str(ctx.exception))
+
+    def test_extra_freshness_field_fails_closed(self):
+        """Unexpected key in freshness fails closed."""
+        fresh = copy.deepcopy(self.tester.sample_freshness)
+        fresh["timezone"] = "UTC"
+        with self.assertRaises(ValueError) as ctx:
+            create_lock_proposal(
+                self.cat_payload,
+                self.tester.sample_env,
+                self.tester.sample_gpu,
+                fresh,
+                self.tester.sample_provenance,
+            )
+        self.assertIn("INVALID_FRESHNESS", str(ctx.exception))
+
+    def test_extra_gpu_evidence_field_fails_closed(self):
+        """Unexpected key in gpu_evidence fails closed."""
+        gpu = copy.deepcopy(self.tester.sample_gpu)
+        gpu["device_vendor"] = "Mesa/Google"
+        with self.assertRaises(ValueError) as ctx:
+            create_lock_proposal(
+                self.cat_payload,
+                self.tester.sample_env,
+                gpu,
+                self.tester.sample_freshness,
+                self.tester.sample_provenance,
+            )
+        self.assertIn("INVALID_GPU_EVIDENCE", str(ctx.exception))
 
 
 class TestGPUEvidenceStrictMatrix(unittest.TestCase):
