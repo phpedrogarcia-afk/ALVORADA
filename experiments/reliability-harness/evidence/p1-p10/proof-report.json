@@ -1,0 +1,114 @@
+{
+  "avd_name": "alvorada_e1_api36_x86_64",
+  "campaign": "ALVORADA_G1_POST_FOUNDER_APPROVAL_001",
+  "ci_run_id": "35746460356",
+  "contract": "ALVORADA_P1_P10_PROOF_SEQUENCE_V1",
+  "gates": {
+    "P1": {
+      "avd_name": "alvorada_e1_api36_x86_64",
+      "config_path": "/home/runner/.android/avd/alvorada_e1_api36_x86_64.avd/config.ini",
+      "contract": "ALVORADA_P1_AVD_CONFIG_V1",
+      "cpu_cores": 2,
+      "descriptor_path": "/home/runner/.android/avd/alvorada_e1_api36_x86_64.ini",
+      "end_time_utc": "2026-09-22T15:20:00.969167+00:00",
+      "gate": "P1",
+      "gpu_mode": "swiftshader",
+      "ram_mb": 2048,
+      "result": "PASS",
+      "start_time_utc": "2026-09-22T15:20:00.968684+00:00",
+      "system_image_package": "system-images;android-36;default;x86_64",
+      "system_image_path": "/usr/local/lib/android/sdk/system-images/android-36/default/x86_64"
+    },
+    "P10": {
+      "adb_recovered": true,
+      "boot_id_changed": true,
+      "boot_id_cold_restart": "7313b1d4-ab96-439b-b7bf-c1c808452765",
+      "boot_id_guest_reboot": "508030e2-dd7a-4c00-bec6-63934b86cb7d",
+      "boot_id_initial": "083cb007-f81c-4651-81d4-8634679a777f",
+      "end_time_utc": "2026-09-22T15:22:30.393131+00:00",
+      "gate": "P10",
+      "package_persisted": true,
+      "result": "PASS",
+      "semantics": "CONTROLLED_GUEST_REBOOT",
+      "start_time_utc": "2026-09-22T15:21:43.069775+00:00"
+    },
+    "P2": {
+      "emulator_binary": "/usr/local/lib/android/sdk/emulator/emulator",
+      "end_time_utc": "2026-09-22T15:20:01.969764+00:00",
+      "gate": "P2",
+      "pid": 3042,
+      "result": "PASS",
+      "start_time_utc": "2026-09-22T15:20:00.969197+00:00"
+    },
+    "P3": {
+      "end_time_utc": "2026-09-22T15:20:21.970930+00:00",
+      "gate": "P3",
+      "monitored_window_seconds": 20,
+      "pid": 3042,
+      "result": "PASS",
+      "start_time_utc": "2026-09-22T15:20:01.969821+00:00"
+    },
+    "P4": {
+      "device_serial": "emulator-5554",
+      "end_time_utc": "2026-09-22T15:20:26.113735+00:00",
+      "gate": "P4",
+      "result": "PASS",
+      "start_time_utc": "2026-09-22T15:20:21.971027+00:00"
+    },
+    "P5": {
+      "boot_id": "083cb007-f81c-4651-81d4-8634679a777f",
+      "device_serial": "emulator-5554",
+      "end_time_utc": "2026-09-22T15:20:47.700633+00:00",
+      "gate": "P5",
+      "package_manager_responsive": true,
+      "result": "PASS",
+      "start_time_utc": "2026-09-22T15:20:26.113833+00:00",
+      "sys_boot_completed": "1"
+    },
+    "P6": {
+      "apk_path": "/home/runner/work/ALVORADA/ALVORADA/experiments/reliability-harness/artifacts/p1-p10/alvorada-harness.apk",
+      "apk_sha256": "2d0caac70df115fccc3d6387ea748100e0e6ca29eb2807bdf39bb1c68fac4a80",
+      "apk_size_bytes": 12691,
+      "contract": "ALVORADA_P6_FIXTURE_BUILD_V1",
+      "end_time_utc": "2026-09-22T15:21:00.158407+00:00",
+      "gate": "P6",
+      "package_name": "org.alvorada.reliability.harness",
+      "result": "PASS",
+      "start_time_utc": "2026-09-22T15:20:47.700689+00:00",
+      "target_api": 36
+    },
+    "P7": {
+      "end_time_utc": "2026-09-22T15:21:00.438925+00:00",
+      "gate": "P7",
+      "installed_apk_path": "/data/app/~~4YWI8IXrPCMsZoV3VEgDxQ==/org.alvorada.reliability.harness-G9Sb_6tvgE-dZg8fWd8dpQ==/base.apk",
+      "package_name": "org.alvorada.reliability.harness",
+      "result": "PASS",
+      "start_time_utc": "2026-09-22T15:21:00.158446+00:00"
+    },
+    "P8": {
+      "activity_component": "org.alvorada.reliability.harness/.HarnessActivity",
+      "broadcast_action": "org.alvorada.reliability.harness.PING",
+      "broadcast_response": "result=42, data=\"ALVORADA_P8_PASS\"",
+      "end_time_utc": "2026-09-22T15:21:00.689780+00:00",
+      "gate": "P8",
+      "package_name": "org.alvorada.reliability.harness",
+      "result": "PASS",
+      "start_time_utc": "2026-09-22T15:21:00.438973+00:00"
+    },
+    "P9": {
+      "boot_id_changed": true,
+      "boot_id_cold_restart": "7313b1d4-ab96-439b-b7bf-c1c808452765",
+      "boot_id_initial": "083cb007-f81c-4651-81d4-8634679a777f",
+      "end_time_utc": "2026-09-22T15:21:43.069724+00:00",
+      "gate": "P9",
+      "package_persisted": true,
+      "result": "PASS",
+      "semantics": "COLD_RESTART_WITHOUT_SNAPSHOT_OR_WIPE",
+      "start_time_utc": "2026-09-22T15:21:00.689824+00:00"
+    }
+  },
+  "overall_status": "PASS",
+  "repository_commit_sha": "4e28a3017b638f3861d83d5afcf973022ee049d8",
+  "selected_gpu": "swiftshader",
+  "system_image_package": "system-images;android-36;default;x86_64"
+}
