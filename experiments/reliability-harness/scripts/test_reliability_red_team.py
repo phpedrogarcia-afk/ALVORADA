@@ -56,14 +56,18 @@ class StateMachineSimulator:
             return "STALE_GENERATION_REJECTED"
 
         # 2. Duplicate / terminal check
+        if occurrence_id == self.parent_occurrence_id:
+            self.duplicate_count += 1
+            return "DUPLICATE_TRIGGER_REJECTED"
+
         if occurrence_id == self.occurrence_id and self.state in (
-            "TRIGGERED", "SOFTWARE_AUDIO_STARTED", "SNOOZED", "DISMISSED"
+            "TRIGGERED", "SOFTWARE_AUDIO_STARTED", "DISMISSED", "RECOVERED_LATE"
         ):
             self.duplicate_count += 1
             return "DUPLICATE_TRIGGER_REJECTED"
 
-        # 3. Only ARMED can trigger legitimately
-        if self.state != "ARMED":
+        # 3. Only ARMED or SNOOZED can trigger legitimately
+        if self.state not in ("ARMED", "SNOOZED"):
             return f"INVALID_TRIGGER_FROM_{self.state}"
 
         self.state = "TRIGGERED"
@@ -177,6 +181,22 @@ class TestReliabilityRedTeam(unittest.TestCase):
 
         # Cannot snooze again while in SNOOZED
         self.assertIn("CANNOT_SNOOZE", self.sm.snooze("child_2"))
+
+        # Trigger child occurrence
+        res_child = self.sm.trigger("child_1", 1)
+        self.assertEqual(res_child, "TRIGGER_ACCEPTED")
+        self.assertEqual(self.sm.state, "SOFTWARE_AUDIO_STARTED")
+        self.assertEqual(self.sm.audio_sessions_started, 2)
+
+        # Duplicate trigger of child occurrence
+        res_dup_child = self.sm.trigger("child_1", 1)
+        self.assertEqual(res_dup_child, "DUPLICATE_TRIGGER_REJECTED")
+        self.assertEqual(self.sm.duplicate_count, 1)
+
+        # Duplicate trigger of parent occurrence
+        res_dup_parent = self.sm.trigger("occ_1", 1)
+        self.assertEqual(res_dup_parent, "DUPLICATE_TRIGGER_REJECTED")
+        self.assertEqual(self.sm.duplicate_count, 2)
 
     # =========================================================================
     # ROLE 2: ANDROID_LIFECYCLE_RED_TEAM

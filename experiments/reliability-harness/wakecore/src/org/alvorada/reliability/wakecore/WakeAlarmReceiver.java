@@ -49,11 +49,23 @@ public final class WakeAlarmReceiver extends BroadcastReceiver {
             }
 
             // 2. Duplicate Trigger Defense
+            boolean isParentOccurrence = occurrenceId != null
+                    && store.parentOccurrenceId != null
+                    && occurrenceId.equals(store.parentOccurrenceId);
+            if (isParentOccurrence) {
+                store.duplicateTriggerCount++;
+                Log.w(TAG, "DUPLICATE_TRIGGER_REJECTED: parent occurrence " + occurrenceId
+                        + " already superseded by snooze child " + store.occurrenceId
+                        + ", duplicate count=" + store.duplicateTriggerCount);
+                store.save();
+                return;
+            }
+
             boolean isSameOccurrence = occurrenceId != null && occurrenceId.equals(store.occurrenceId);
             boolean alreadyTriggered = WakeConstants.STATE_TRIGGERED.equals(store.state)
                     || WakeConstants.STATE_SOFTWARE_AUDIO_STARTED.equals(store.state)
-                    || WakeConstants.STATE_SNOOZED.equals(store.state)
-                    || WakeConstants.STATE_DISMISSED.equals(store.state);
+                    || WakeConstants.STATE_DISMISSED.equals(store.state)
+                    || WakeConstants.STATE_RECOVERED_LATE.equals(store.state);
 
             if (isSameOccurrence && alreadyTriggered) {
                 store.duplicateTriggerCount++;
