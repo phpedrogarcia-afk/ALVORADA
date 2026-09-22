@@ -71,8 +71,8 @@ public final class WakeAudioCheckpoint {
                     AudioTrack.MODE_STATIC,
                     android.media.AudioManager.AUDIO_SESSION_ID_GENERATE);
 
-            // Verify AudioTrack successfully initialized
-            if (track.getState() != AudioTrack.STATE_INITIALIZED) {
+            // Verify AudioTrack successfully acquired native resources (not STATE_UNINITIALIZED)
+            if (track.getState() == AudioTrack.STATE_UNINITIALIZED) {
                 recordAudioFailure(store, "AudioTrack failed to initialize, state=" + track.getState());
                 return;
             }
@@ -89,6 +89,12 @@ public final class WakeAudioCheckpoint {
             int written = track.write(wavBytes, pcmOffset, pcmLength);
             if (written <= 0 || written != pcmLength) {
                 recordAudioFailure(store, "PCM write rejected: expected " + pcmLength + " bytes, written=" + written);
+                return;
+            }
+
+            // In MODE_STATIC, writing audio transitions the track to STATE_INITIALIZED
+            if (track.getState() != AudioTrack.STATE_INITIALIZED) {
+                recordAudioFailure(store, "AudioTrack not STATE_INITIALIZED after write, state=" + track.getState());
                 return;
             }
 
