@@ -158,7 +158,9 @@ class Wave2AvdManager:
 
     def create_avd(self, force_recreate: bool = False) -> Dict[str, Any]:
         """Create the AVD using avdmanager if absent or if recreation is required."""
+        (Path.home() / ".android" / "avd").mkdir(parents=True, exist_ok=True)
         self.avd_home.mkdir(parents=True, exist_ok=True)
+
         status, config, reason = self.inspect_existing_avd()
 
         if status == "MATCH" and not force_recreate:
@@ -183,6 +185,7 @@ class Wave2AvdManager:
             else:
                 avdmanager_bin = Path("avdmanager")
 
+        avd_dir = self.get_avd_directory()
         cmd = [
             str(avdmanager_bin),
             "create",
@@ -191,9 +194,12 @@ class Wave2AvdManager:
             self.avd_name,
             "--package",
             LOCKED_SYSTEM_IMAGE_PACKAGE,
-            "--device",
-            "pixel",
+            "--path",
+            str(avd_dir),
+            "--force",
         ]
+
+        print(f"EXECUTING_AVDMANAGER: {' '.join(cmd)}")
 
         # Execute creation with stdin 'no' (custom hardware profile prompt)
         res = subprocess.run(
@@ -203,11 +209,33 @@ class Wave2AvdManager:
             check=False,
         )
 
+        stdout_str = res.stdout.decode("utf-8", errors="replace")
+        stderr_str = res.stderr.decode("utf-8", errors="replace")
+        print(f"AVDMANAGER_STDOUT:\n{stdout_str}")
+        if stderr_str:
+            print(f"AVDMANAGER_STDERR:\n{stderr_str}")
+
         if res.returncode != 0:
-            stderr_str = res.stderr.decode("utf-8", errors="replace")
-            stdout_str = res.stdout.decode("utf-8", errors="replace")
             raise AvdInspectionError(
                 f"avdmanager create avd failed (code {res.returncode}):\nSTDOUT: {stdout_str}\nSTDERR: {stderr_str}"
+            )
+
+        # Ensure descriptor .ini exists and points to avd_dir
+        descriptor_ini = self.get_avd_descriptor_ini()
+        if not descriptor_ini.is_file():
+            write_ini_file(
+                descriptor_ini,
+                {
+                    "path": str(avd_dir),
+                    "target": "android-36",
+                },
+            )
+
+        # Ensure avd_dir directory exists
+        if not avd_dir.is_dir():
+            raise AvdInspectionError(
+                f"avdmanager succeeded with code 0 but AVD directory was not created at {avd_dir}.\n"
+                f"STDOUT: {stdout_str}\nSTDERR: {stderr_str}"
             )
 
         # Apply locked hardware parameters
