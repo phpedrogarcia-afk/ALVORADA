@@ -61,18 +61,27 @@ jobs:
         run: |
           python3 -m unittest discover -s experiments/reliability-harness/scripts -p "test_*.py"
 
-      - name: Causal runtime probe for libpulse
+      - name: Causal runtime probe for libpulse and virtual audio sink
         shell: bash
         run: |
-          python3 -c "import ctypes.util, sys; sys.exit(0 if ctypes.util.find_library('pulse') else 1)" && LIBPULSE_EXISTS=1 || LIBPULSE_EXISTS=0
-          echo "LIBPULSE_PRE_PROBE_EXISTS=$LIBPULSE_EXISTS"
-          if [ "$LIBPULSE_EXISTS" -eq 0 ]; then
-            echo "CAUSAL_MUTATION=INSTALLING_LIBPULSE0"
-            sudo apt-get update && sudo apt-get install -y libpulse0
-            python3 -c "import ctypes.util, sys; lib = ctypes.util.find_library('pulse'); print('LIBPULSE_RESOLVED=' + str(lib)); sys.exit(0 if lib else 1)"
-          else
-            echo "CAUSAL_MUTATION=NONE_REQUIRED"
-          fi
+          echo "=== PROBING LIBPULSE AND PULSEAUDIO ==="
+          sudo apt-get update && sudo apt-get install -y pulseaudio libpulse0
+          python3 -c "import ctypes.util, sys; lib = ctypes.util.find_library('pulse'); print('LIBPULSE_RESOLVED=' + str(lib)); sys.exit(0 if lib else 1)"
+
+          PULSE_DIR="${{ runner.temp }}/xdg_runtime_dir"
+          mkdir -p "$PULSE_DIR"
+          chmod 700 "$PULSE_DIR"
+          export XDG_RUNTIME_DIR="$PULSE_DIR"
+          echo "XDG_RUNTIME_DIR=$PULSE_DIR" >> $GITHUB_ENV
+
+          pulseaudio --start --exit-idle-time=-1 || true
+          pactl load-module module-null-sink sink_name=dummy_sink || true
+          pactl set-default-sink dummy_sink || true
+          pactl list sinks short || true
+
+          echo "QEMU_AUDIO_DRV=pa" >> $GITHUB_ENV
+          echo "QEMU_PA_SINK=dummy_sink" >> $GITHUB_ENV
+          echo "VIRTUAL_AUDIO_SINK_CONFIGURED=TRUE"
 
       - name: Execute Wave 1 deterministic provisioning and adversarial audit
         shell: bash

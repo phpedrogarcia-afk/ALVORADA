@@ -76,7 +76,6 @@ class E1ScenarioRunner:
             self.emulator_bin,
             "-avd", self.avd_name,
             "-no-window",
-            "-no-audio",
             "-gpu", "swiftshader",
             "-no-boot-anim",
             "-no-snapshot",
@@ -327,7 +326,9 @@ class E1ScenarioRunner:
             final_state = self.poll_for_state(["SOFTWARE_AUDIO_STARTED"], timeout_seconds=12.0)
             st = final_state.get("state")
             if st != "SOFTWARE_AUDIO_STARTED":
-                raise E1ScenarioError(f"A1 rep {rep}: timed out waiting for SOFTWARE_AUDIO_STARTED, current={st}")
+                chk = final_state.get("software_audio_checkpoint")
+                reason = final_state.get("audio_failure_reason")
+                raise E1ScenarioError(f"A1 rep {rep}: timed out waiting for SOFTWARE_AUDIO_STARTED, current={st}, checkpoint={chk}, reason={reason}")
 
             # Invariant assertions
             dup_count = final_state.get("duplicate_trigger_count", 0)
@@ -385,7 +386,9 @@ class E1ScenarioRunner:
             final_state = self.poll_for_state(["SOFTWARE_AUDIO_STARTED"], timeout_seconds=14.0)
             st = final_state.get("state")
             if st != "SOFTWARE_AUDIO_STARTED":
-                raise E1ScenarioError(f"A2 rep {rep}: failed to trigger after process kill, current={st}")
+                chk = final_state.get("software_audio_checkpoint")
+                reason = final_state.get("audio_failure_reason")
+                raise E1ScenarioError(f"A2 rep {rep}: failed to trigger after process kill, current={st}, checkpoint={chk}, reason={reason}")
 
             dup_count = final_state.get("duplicate_trigger_count", 0)
             delta_ms = final_state.get("delivery_delta_ms", 0)

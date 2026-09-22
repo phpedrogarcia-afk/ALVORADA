@@ -44,10 +44,14 @@ public final class WakeAudioCheckpoint {
         AudioTrack track = null;
         try {
             int sampleRate = AudioMarker.SAMPLE_RATE;
-            int bufferSize = Math.max(wavBytes.length, AudioTrack.getMinBufferSize(
-                    sampleRate,
-                    AudioFormat.CHANNEL_OUT_MONO,
-                    AudioFormat.ENCODING_PCM_16BIT));
+            int pcmOffset = 44;
+            int pcmLength = wavBytes.length - pcmOffset;
+            if (pcmLength <= 0) {
+                recordAudioFailure(store, "Invalid PCM length: " + pcmLength);
+                return;
+            }
+
+            int bufferSize = pcmLength;
 
             AudioAttributes attrs = new AudioAttributes.Builder()
                     .setUsage(AudioAttributes.USAGE_ALARM)
@@ -79,14 +83,6 @@ public final class WakeAudioCheckpoint {
             // Check simulated fault: WRITE_FAIL
             if ("WRITE_FAIL".equalsIgnoreCase(fault)) {
                 recordAudioFailure(store, "INJECTED_FAULT: simulated PCM write failure");
-                return;
-            }
-
-            // Write PCM data portion (skip 44-byte WAV header)
-            int pcmOffset = 44;
-            int pcmLength = wavBytes.length - pcmOffset;
-            if (pcmLength <= 0) {
-                recordAudioFailure(store, "Invalid PCM length: " + pcmLength);
                 return;
             }
 
@@ -124,6 +120,7 @@ public final class WakeAudioCheckpoint {
             store.softwareAudioStartedAtEpochMs = startedWallMs;
             store.softwareAudioStarted = true;
             store.softwareAudioFailed = false;
+            store.audioFailureReason = "";
             store.softwareAudioCheckpoint = WakeConstants.CHECKPOINT_SOFTWARE_AUDIO_STARTED;
             if (!WakeConstants.STATE_RECOVERED_LATE.equals(store.state)) {
                 store.state = WakeConstants.STATE_SOFTWARE_AUDIO_STARTED;
@@ -155,6 +152,7 @@ public final class WakeAudioCheckpoint {
         Log.e(TAG, "SOFTWARE_AUDIO_FAILED: " + reason);
         store.softwareAudioStarted = false;
         store.softwareAudioFailed = true;
+        store.audioFailureReason = (reason != null) ? reason : "UNKNOWN";
         store.softwareAudioCheckpoint = WakeConstants.CHECKPOINT_SOFTWARE_AUDIO_FAILED;
         store.state = WakeConstants.STATE_SOFTWARE_AUDIO_FAILED;
         store.save();
