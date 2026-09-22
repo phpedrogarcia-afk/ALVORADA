@@ -73,7 +73,8 @@ jobs:
               ))
 
           present_before = has_libpulse()
-          print(f"LIBPULSE_PRESENT_BEFORE={\"YES\" if present_before else \"NO\"}")
+          ans_before = "YES" if present_before else "NO"
+          print(f"LIBPULSE_PRESENT_BEFORE={ans_before}")
 
           if not present_before:
               print("LIBPULSE_MUTATION=REQUIRED")
@@ -89,7 +90,8 @@ jobs:
                   print("ERROR: apt-get install libpulse0 failed", file=sys.stderr)
                   sys.exit(rc2)
               present_after = has_libpulse()
-              print(f"LIBPULSE_PRESENT_AFTER={\"YES\" if present_after else \"NO\"}")
+              ans_after = "YES" if present_after else "NO"
+              print(f"LIBPULSE_PRESENT_AFTER={ans_after}")
               if not present_after:
                   print("ERROR: libpulse.so.0 still absent after mutation", file=sys.stderr)
                   sys.exit(1)
