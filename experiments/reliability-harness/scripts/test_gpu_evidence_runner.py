@@ -23,6 +23,7 @@ from gpu_evidence_runner import (
     check_libpulse,
     extract_package_xml_revision,
     extract_source_properties_revision,
+    is_intro_header,
     is_strict_header,
     parse_gpu_help_output,
     run_gpu_evidence_probe,
@@ -66,6 +67,12 @@ class TestGpuHelpHeaderDetector(unittest.TestCase):
         ]
         for h in invalid_headers:
             self.assertFalse(is_strict_header(h), f"Expected False for invalid header: {h!r}")
+
+    def test_intro_headers(self):
+        self.assertTrue(is_intro_header("Use -gpu <mode> to override the mode of GPU emulation indicated by the"))
+        self.assertTrue(is_intro_header("  use -gpu <mode> to override"))
+        self.assertFalse(is_intro_header("Use -camera-back <mode> to override"))
+        self.assertFalse(is_intro_header("Usage: emulator -gpu <mode>"))
 
 
 class TestGpuHelpParser(unittest.TestCase):
@@ -166,6 +173,28 @@ Options for GPU rendering:
         status, candidates = parse_gpu_help_output(raw)
         self.assertEqual(status, "AMBIGUOUS")
         self.assertEqual(candidates, [])
+
+    def test_empirical_emulator_37_1_11_help_gpu_output(self):
+        raw = """\
+  Use -gpu <mode> to override the mode of GPU emulation indicated by the
+  AVD's hardware-qemu.inifile.
+
+     auto (default)       -> Auto-select the renderer, recommended.
+     host                 -> Use the host system's GPU drivers.
+     software             -> Use default software renderer.
+     lavapipe             -> Use Lavapipe software renderer for Vulkan and
+                             auto-select software backend for GLES.
+     swiftshader          -> Use SwiftShader software renderer for GLES
+                             and Vulkan.
+     swangle              -> Use ANGLE with Swiftshader backend for GLES and
+                             Swiftshader for Vulkan.
+"""
+        status, candidates = parse_gpu_help_output(raw)
+        self.assertEqual(status, "PASS_STRICT")
+        self.assertEqual(
+            candidates,
+            ["auto", "host", "lavapipe", "software", "swangle", "swiftshader"]
+        )
 
     def test_empty_output_fails_unavailable(self):
         status, candidates = parse_gpu_help_output("")

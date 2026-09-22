@@ -364,6 +364,15 @@ def is_strict_header(line: str) -> bool:
     return has_topic or explicit_seq
 
 
+def is_intro_header(line: str) -> bool:
+    """
+    Detects emulator CLI intro header:
+    'Use -gpu <mode> to override...'
+    """
+    clean = strip_log_prefix(line).strip().lower()
+    return bool(re.match(r"^use\s+-gpu\s+<mode>\s+to\s+override", clean))
+
+
 def parse_gpu_help_output(raw_text: str) -> Tuple[str, List[str]]:
     """
     Parses output of `emulator -help-gpu` into candidate GPU modes.
@@ -388,6 +397,8 @@ def parse_gpu_help_output(raw_text: str) -> Tuple[str, List[str]]:
         "swiftshader",
         "auto-no-window",
         "software",
+        "lavapipe",
+        "swangle",
     }
 
     excluded_keywords = {
@@ -396,13 +407,18 @@ def parse_gpu_help_output(raw_text: str) -> Tuple[str, List[str]]:
         "info", "error", "see", "emulator", "options", "option", "values", "value"
     }
 
-    # Check for strict block header
-    header_indices = [idx for idx, line in enumerate(lines) if is_strict_header(line)]
+    # 1. Check for strict colon headers and intro headers
+    colon_header_indices = [idx for idx, line in enumerate(lines) if is_strict_header(line)]
+    intro_header_indices = [idx for idx, line in enumerate(lines) if is_intro_header(line)]
+
+    total_headers = len(colon_header_indices) + len(intro_header_indices)
+    if total_headers > 1:
+        return "AMBIGUOUS", []
 
     candidates: List[str] = []
 
-    # If no strict block header ending with colon, check for inline list line
-    if len(header_indices) == 0:
+    # If no block header found, check for inline list line
+    if total_headers == 0:
         inline_matches: List[Tuple[int, List[str]]] = []
         for idx, line in enumerate(lines):
             clean = strip_log_prefix(line).strip()
@@ -426,19 +442,16 @@ def parse_gpu_help_output(raw_text: str) -> Tuple[str, List[str]]:
             return "PASS_STRICT", normalized
         return "AMBIGUOUS", []
 
-    if len(header_indices) != 1:
-        return "AMBIGUOUS", []
-
-    header_idx = header_indices[0]
+    start_idx = colon_header_indices[0] if colon_header_indices else intro_header_indices[0]
     expected_indent: Optional[int] = None
     started = False
 
     candidate_pattern = re.compile(
-        r"^(\s+)(?:[-*+]\s+)?['\"`]?([a-z][a-z0-9_-]{0,63})['\"`]?(?:(?:\s*)$|(?:\s*:\s*|\s+-\s+|\s{2,})(.*))$",
+        r"^(\s+)(?:[-*+]\s+)?['\"`]?([a-z][a-z0-9_-]{0,63})['\"`]?(?:\s*\([^)]+\))?(?:(?:\s*)$|(?:\s*->\s*|\s*:\s*|\s+-\s+|\s{2,})(.*))$",
         re.IGNORECASE,
     )
 
-    for line in lines[header_idx + 1:]:
+    for line in lines[start_idx + 1:]:
         stripped = line.strip()
         if not stripped:
             if started:
@@ -451,6 +464,11 @@ def parse_gpu_help_output(raw_text: str) -> Tuple[str, List[str]]:
             ("warning:", "info:", "error:", "debug:", "emulator:")
         ):
             continue
+
+        # If intro header was used, skip intro description lines before candidates start
+        if not started and intro_header_indices:
+            if "hardware-qemu.ini" in line.lower() or "override" in line.lower():
+                continue
 
         m = candidate_pattern.match(line)
         if m is not None:
