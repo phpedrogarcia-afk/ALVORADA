@@ -2,16 +2,25 @@
 
 **Status**: INVALIDATED / SUPERSEDED
 **Original Run ID**: 35729959417
-**Original Commit**: a75623749b998b2affd2834cc5ce31c9fda3e4b2
-**Superseding Run ID**: 35734871241
-**Superseding Commit**: e7f1601e04fc151a791d6cdf033cbdb679bd4060
+**RUN_HEAD_SHA**: 68e094a3d1966a6f466e332630890fd166003c01
+**HISTORICAL_PROPOSAL_COMMIT**: a75623749b998b2affd2834cc5ce31c9fda3e4b2
+**INVALIDATION_RECORD_COMMIT**: 8c26c4ce3a42841b543e709207460ab190b78321
+**SUPERSEDING_RUN_ID**: 35734871241
+**SUPERSEDING_RUN_HEAD_SHA**: e7f1601e04fc151a791d6cdf033cbdb679bd4060
+
+---
+
+### Clarification on Provenance Lineage:
+- `RUN_HEAD_SHA` (`68e094a3d1966a6f466e332630890fd166003c01`): The exact repository commit checked out and executed by GitHub Actions runner during run `35729959417`.
+- `HISTORICAL_PROPOSAL_COMMIT` (`a75623749b998b2affd2834cc5ce31c9fda3e4b2`): The subsequent commit that assembled `ALVORADA_LOCK_PROPOSAL_V1` and checked the evidence folder into git tracking.
+- `INVALIDATION_RECORD_COMMIT` (`8c26c4ce3a42841b543e709207460ab190b78321`): The commit where this invalidation notice was introduced.
 
 ---
 
 ### Audit Findings Leading to Invalidation:
 
 1. **F-001 (Trigger Policy Non-Compliance)**:
-   The workflow `e1-lab-gpu-evidence-recovery.yml` at commit `a756237` contained automatic `push` triggers on `fio/g1-autonomy-recovery`, violating the mandatory requirement that experimental evidence generation be `workflow_dispatch` ONLY.
+   The workflow `e1-lab-gpu-evidence-recovery.yml` at execution commit `68e094a` contained automatic `push` triggers on `fio/g1-autonomy-recovery`, violating the mandatory contract requirement that experimental evidence generation be `workflow_dispatch` ONLY.
 
 2. **F-002 (Commit Admission Gap)**:
    The workflow lacked strict triple-guard commit admission verification against `expected_head_sha`.

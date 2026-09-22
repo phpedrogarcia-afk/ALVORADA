@@ -70,6 +70,27 @@ class TestProposalAssemblyRunner(unittest.TestCase):
         with open(self.gpu_evidence_path, "wb") as f:
             f.write(canonicalize_json_v1(self.gpu_evidence_data))
 
+        # Explicit test fixtures (FG-002: no hardcoded defaults in production)
+        self.explicit_env = {
+            "cmdline_tools_revision": "12.0",
+            "emulator_revision": "37.1.11",
+            "jdk_major": 17,
+            "runner_image_label": "ubuntu24",
+            "runner_image_version": "20260907.300.1",
+            "runner_os": "Linux",
+        }
+        self.explicit_prov = {
+            "catalog_run_id": "35676154497",
+            "repository_commit_sha": "8570a837852a2ab669092ac3940086a1fdc1cb81",
+            "runner_image_label": "ubuntu24",
+            "runner_image_version": "20260907.300.1",
+        }
+        self.explicit_fresh = {
+            "observed_at": "2026-09-22T01:32:53Z",
+            "fresh_until": "2026-09-29T01:32:53Z",
+            "max_age_days": 7,
+        }
+
     def tearDown(self):
         shutil.rmtree(self.temp_dir, ignore_errors=True)
 
@@ -86,11 +107,14 @@ class TestProposalAssemblyRunner(unittest.TestCase):
         with open(os.path.join(directory, "checksums.sha256"), "w", encoding="utf-8") as f:
             f.writelines(entries)
 
-    def test_assemble_lock_proposal_success(self):
+    def test_assemble_lock_proposal_v1_with_all_explicit_values_passes(self):
         exit_code, proposal, proposal_digest = assemble_lock_proposal(
             catalog_projection_path=self.projection_path,
             gpu_evidence_path=self.gpu_evidence_path,
             output_dir=self.out_dir,
+            environment_override=self.explicit_env,
+            provenance_override=self.explicit_prov,
+            freshness_override=self.explicit_fresh,
         )
         self.assertEqual(exit_code, 0)
         self.assertEqual(proposal["contract"], "ALVORADA_LOCK_PROPOSAL_V1")
@@ -121,6 +145,39 @@ class TestProposalAssemblyRunner(unittest.TestCase):
         self.assertEqual(len(chk_lines), 2)
         self.assertTrue(chk_lines[0].startswith(proposal_digest))
 
+    def test_assemble_v1_without_explicit_environment_fails(self):
+        with self.assertRaises(ValueError) as ctx:
+            assemble_lock_proposal(
+                catalog_projection_path=self.projection_path,
+                gpu_evidence_path=self.gpu_evidence_path,
+                output_dir=self.out_dir,
+                provenance_override=self.explicit_prov,
+                freshness_override=self.explicit_fresh,
+            )
+        self.assertIn("MISSING_EXPLICIT_INPUT: environment_override", str(ctx.exception))
+
+    def test_assemble_v1_without_explicit_provenance_fails(self):
+        with self.assertRaises(ValueError) as ctx:
+            assemble_lock_proposal(
+                catalog_projection_path=self.projection_path,
+                gpu_evidence_path=self.gpu_evidence_path,
+                output_dir=self.out_dir,
+                environment_override=self.explicit_env,
+                freshness_override=self.explicit_fresh,
+            )
+        self.assertIn("MISSING_EXPLICIT_INPUT: provenance_override", str(ctx.exception))
+
+    def test_assemble_v1_without_explicit_freshness_fails(self):
+        with self.assertRaises(ValueError) as ctx:
+            assemble_lock_proposal(
+                catalog_projection_path=self.projection_path,
+                gpu_evidence_path=self.gpu_evidence_path,
+                output_dir=self.out_dir,
+                environment_override=self.explicit_env,
+                provenance_override=self.explicit_prov,
+            )
+        self.assertIn("MISSING_EXPLICIT_INPUT: freshness_override", str(ctx.exception))
+
     def test_assemble_fails_on_projection_mismatch(self):
         # Alter projection_sha256 in gpu_evidence
         bad_gpu = dict(self.gpu_evidence_data)
@@ -133,6 +190,9 @@ class TestProposalAssemblyRunner(unittest.TestCase):
                 catalog_projection_path=self.projection_path,
                 gpu_evidence_path=self.gpu_evidence_path,
                 output_dir=self.out_dir,
+                environment_override=self.explicit_env,
+                provenance_override=self.explicit_prov,
+                freshness_override=self.explicit_fresh,
             )
         self.assertIn("PROJECTION_MISMATCH", str(ctx.exception))
 
@@ -152,6 +212,8 @@ class TestProposalAssemblyRunner(unittest.TestCase):
                 gpu_evidence_path=self.gpu_evidence_path,
                 output_dir=self.out_dir,
                 environment_override=bad_env,
+                provenance_override=self.explicit_prov,
+                freshness_override=self.explicit_fresh,
             )
 
     def test_assemble_v2_from_directories_success(self):
@@ -477,6 +539,23 @@ class TestProposalAssemblyRunner(unittest.TestCase):
                 gpu_dir=gpu_dir,
             )
         self.assertIn("MISSING_CHECKSUMS_FILE", str(ctx.exception))
+
+    def test_current_v2_proposal_digest_immutability(self):
+        cat_evidence_dir = os.path.join(os.path.dirname(SCRIPTS_DIR), "evidence", "catalog-discovery-35734672486")
+        gpu_evidence_dir = os.path.join(os.path.dirname(SCRIPTS_DIR), "evidence", "gpu-evidence-35734871241")
+        if os.path.isdir(cat_evidence_dir) and os.path.isdir(gpu_evidence_dir):
+            test_out = os.path.join(self.temp_dir, "immutability_test")
+            exit_code, proposal, prop_digest = assemble_lock_proposal(
+                output_dir=test_out,
+                catalog_dir=cat_evidence_dir,
+                gpu_dir=gpu_evidence_dir,
+            )
+            self.assertEqual(exit_code, 0)
+            self.assertEqual(
+                prop_digest,
+                "5517290ec9b90cdcbc13ad34a1228a1ff422f2a5c2326d622e9f2ae249b411b4",
+                "UNEXPECTED_EMPIRICAL_PROPOSAL_DRIFT",
+            )
 
 
 if __name__ == "__main__":

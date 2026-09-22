@@ -275,25 +275,24 @@ def assemble_lock_proposal(
         else:
             gpu_projection_sha256 = gpu_evidence.get("projection_sha256", "0" * 64)
 
-        environment = environment_override or {
-            "cmdline_tools_revision": "12.0",
-            "emulator_revision": "37.1.11",
-            "jdk_major": 17,
-            "runner_image_label": "ubuntu24",
-            "runner_image_version": "20260907.300.1",
-            "runner_os": "Linux",
-        }
-        provenance = provenance_override or {
-            "catalog_run_id": "35676154497",
-            "repository_commit_sha": "8570a837852a2ab669092ac3940086a1fdc1cb81",
-            "runner_image_label": "ubuntu24",
-            "runner_image_version": "20260907.300.1",
-        }
-        freshness = freshness_override or {
-            "observed_at": "2026-09-22T01:32:53Z",
-            "fresh_until": "2026-09-29T01:32:53Z",
-            "max_age_days": 7,
-        }
+        # V1 / explicit override pathway (requires all semantic inputs explicitly supplied)
+        if environment_override is None:
+            raise ValueError(
+                "MISSING_EXPLICIT_INPUT: environment_override is required when not assembling from V2 provenance artifacts"
+            )
+        if provenance_override is None:
+            raise ValueError(
+                "MISSING_EXPLICIT_INPUT: provenance_override is required when not assembling from V2 provenance artifacts"
+            )
+        if freshness_override is None:
+            raise ValueError(
+                "MISSING_EXPLICIT_INPUT: freshness_override is required when not assembling from V2 provenance artifacts"
+            )
+
+        environment = environment_override
+        provenance = provenance_override
+        freshness = freshness_override
+
 
         # If provenance has V2 keys, create V2; else V1
         if "catalog_commit_sha" in provenance:
