@@ -1,0 +1,118 @@
+name: E1 lab Wave 1 locked environment provisioning
+
+on:
+  workflow_dispatch:
+    inputs:
+      expected_head_sha:
+        description: 'Expected commit SHA on fio/g1-autonomy-recovery'
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: e1-lab-wave1-locked-provision-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  wave1-provision-and-audit:
+    name: Provision locked Android environment and adversarial audit
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    env:
+      ALVORADA_REPOSITORY_VISIBILITY: ${{ github.event.repository.private && 'private' || 'public' }}
+      ALVORADA_WORKFLOW_PERMISSIONS: contents:read
+    steps:
+      - name: Guard branch ref
+        shell: bash
+        run: |
+          if [ "${{ github.ref }}" != "refs/heads/fio/g1-autonomy-recovery" ]; then
+            echo "ERROR: Invalid ref '${{ github.ref }}', expected 'refs/heads/fio/g1-autonomy-recovery'" >&2
+            exit 1
+          fi
+
+      - name: Checkout exact commit
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+        with:
+          ref: ${{ github.sha }}
+
+      - name: Verify checked-out commit matches HEAD and expected SHA
+        shell: bash
+        run: |
+          expected="${{ inputs.expected_head_sha }}"
+          if [ -z "$expected" ]; then
+            echo "ERROR: inputs.expected_head_sha is required but was empty" >&2
+            exit 1
+          fi
+          checked_out="$(git rev-parse HEAD)"
+          if [ "$checked_out" != "$expected" ]; then
+            echo "ERROR: Checked-out commit ($checked_out) does not match expected_head_sha ($expected)" >&2
+            exit 1
+          fi
+          if [ "$checked_out" != "${{ github.sha }}" ]; then
+            echo "ERROR: Checked-out commit ($checked_out) does not match github.sha (${{ github.sha }})" >&2
+            exit 1
+          fi
+          echo "HEAD_VERIFIED=$checked_out"
+
+      - name: Pre-execution automated test suite
+        shell: bash
+        run: |
+          python3 -m unittest discover -s experiments/reliability-harness/scripts -p "test_*.py"
+
+      - name: Causal runtime probe for libpulse
+        shell: bash
+        run: |
+          python3 -c "import ctypes.util, sys; sys.exit(0 if ctypes.util.find_library('pulse') else 1)" && LIBPULSE_EXISTS=1 || LIBPULSE_EXISTS=0
+          echo "LIBPULSE_PRE_PROBE_EXISTS=$LIBPULSE_EXISTS"
+          if [ "$LIBPULSE_EXISTS" -eq 0 ]; then
+            echo "CAUSAL_MUTATION=INSTALLING_LIBPULSE0"
+            sudo apt-get update && sudo apt-get install -y libpulse0
+            python3 -c "import ctypes.util, sys; lib = ctypes.util.find_library('pulse'); print('LIBPULSE_RESOLVED=' + str(lib)); sys.exit(0 if lib else 1)"
+          else
+            echo "CAUSAL_MUTATION=NONE_REQUIRED"
+          fi
+
+      - name: Execute Wave 1 deterministic provisioning and adversarial audit
+        shell: bash
+        run: |
+          obs_time="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          mkdir -p experiments/reliability-harness/artifacts
+          python3 experiments/reliability-harness/scripts/wave1_provision_runner.py \
+            --lock-file experiments/reliability-harness/evidence/lock/lock.json \
+            --output-dir experiments/reliability-harness/artifacts \
+            --repo-sha "${{ github.sha }}" \
+            --run-id "${{ github.run_id }}" \
+            --observed-at "$obs_time"
+
+      - name: Verify Wave 1 artifact checksums
+        shell: bash
+        run: |
+          cd experiments/reliability-harness/artifacts
+          sha256sum -c checksums.sha256
+
+      - name: Assert locked environment match
+        shell: bash
+        run: |
+          python3 -c "
+          import json, sys
+          with open('experiments/reliability-harness/artifacts/wave1-environment.json') as f:
+              data = json.load(f)
+          if not data.get('locked_environment_match'):
+              print('ERROR: locked_environment_match is not True!', file=sys.stderr)
+              sys.exit(1)
+          if data.get('lock_digest') != 'ac243a03caca0333eec85721cbd27f828a001c3b19ed80d7994e33589f065f05':
+              print('ERROR: lock_digest mismatch!', file=sys.stderr)
+              sys.exit(1)
+          print('WAVE1_LOCKED_MATCH_VERIFIED=TRUE')
+          "
+
+      - name: Upload Wave 1 provisioning artifacts
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: wave1-provision-${{ github.sha }}-${{ github.run_id }}
+          path: experiments/reliability-harness/artifacts/
+          if-no-files-found: error
+          retention-days: 1
