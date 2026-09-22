@@ -1,10 +1,10 @@
-#!/usr/bin/env python3
-"""Unit tests for Static Fixture Builder (fixture_builder.py)."""
+from __future__ import annotations
 
 import hashlib
 from pathlib import Path
 import shutil
 import tempfile
+from typing import Any, Dict, List, Optional, Tuple
 import unittest
 from unittest.mock import MagicMock, patch
 import zipfile

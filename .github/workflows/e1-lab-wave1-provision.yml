@@ -163,5 +163,5 @@ jobs:
         with:
           name: execution-campaign-${{ github.sha }}-${{ github.run_id }}
           path: experiments/reliability-harness/artifacts/
-          if-no-files-found: error
+          if-no-files-found: warn
           retention-days: 7

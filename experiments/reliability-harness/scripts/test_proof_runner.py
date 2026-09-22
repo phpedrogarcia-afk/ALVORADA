@@ -1,9 +1,9 @@
-#!/usr/bin/env python3
-"""Unit tests for P1-P10 Proof Runner (proof_runner.py)."""
+from __future__ import annotations
 
 import json
 from pathlib import Path
 import tempfile
+from typing import Any, Dict, List, Optional, Tuple
 import unittest
 from unittest.mock import MagicMock, patch
 
