@@ -1,0 +1,111 @@
+name: E1 lab GPU capability evidence (Recovery)
+
+on:
+  workflow_dispatch:
+    inputs:
+      expected_head_sha:
+        description: 'Expected commit SHA on fio/g1-autonomy-recovery'
+        required: false
+        type: string
+  push:
+    branches:
+      - fio/g1-autonomy-recovery
+    paths:
+      - '.github/workflows/e1-lab-gpu-evidence-recovery.yml'
+      - 'experiments/reliability-harness/scripts/gpu_evidence_runner.py'
+      - 'experiments/reliability-harness/scripts/test_gpu_evidence_runner.py'
+      - 'experiments/reliability-harness/scripts/catalog_core.py'
+      - 'experiments/reliability-harness/scripts/catalog_lock_model.py'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: e1-lab-gpu-evidence-recovery-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  gpu-evidence-probe:
+    name: Ephemeral GPU capability probe (Recovery)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    env:
+      ALVORADA_REPOSITORY_VISIBILITY: ${{ github.event.repository.private && 'private' || 'public' }}
+      ALVORADA_WORKFLOW_PERMISSIONS: contents:read
+    steps:
+      - name: Guard branch ref
+        shell: bash
+        run: |
+          if [ "${{ github.ref }}" != "refs/heads/fio/g1-autonomy-recovery" ]; then
+            echo "ERROR: Invalid ref '${{ github.ref }}', expected 'refs/heads/fio/g1-autonomy-recovery'" >&2
+            exit 1
+          fi
+
+      - name: Checkout exact commit
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+        with:
+          ref: ${{ github.sha }}
+
+      - name: Verify checked-out commit matches HEAD
+        shell: bash
+        run: |
+          checked_out="$(git rev-parse HEAD)"
+          expected="${{ inputs.expected_head_sha }}"
+          if [ -n "$expected" ] && [ "$checked_out" != "$expected" ]; then
+            echo "ERROR: Checked-out commit ($checked_out) does not match expected_head_sha ($expected)" >&2
+            exit 1
+          fi
+          if [ "$checked_out" != "${{ github.sha }}" ]; then
+            echo "ERROR: Checked-out commit ($checked_out) does not match github.sha (${{ github.sha }})" >&2
+            exit 1
+          fi
+          echo "HEAD_VERIFIED=$checked_out"
+
+      - name: Ensure libpulse runtime dependency
+        shell: bash
+        run: |
+          sudo apt-get update && sudo apt-get install -y --no-install-recommends libpulse0 || true
+
+      - name: Pre-execution automated test suite
+        shell: bash
+        run: |
+          python3 -m unittest discover -s experiments/reliability-harness/scripts -p "test_*.py"
+
+      - name: Execute ephemeral GPU capability probe
+        shell: bash
+        run: |
+          obs_time="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          mkdir -p experiments/reliability-harness/artifacts
+          python3 experiments/reliability-harness/scripts/gpu_evidence_runner.py \
+            --output-dir experiments/reliability-harness/artifacts \
+            --repo-sha "${{ github.sha }}" \
+            --run-id "${{ github.run_id }}" \
+            --observed-at "$obs_time" \
+            --candidate-revision "37.1.11" \
+            --projection-sha256 "64f3ddd82cc72dacc9146e492345d1f7db8196cff053d7343521021140a7404e"
+
+      - name: Verify artifact checksums
+        shell: bash
+        run: |
+          cd experiments/reliability-harness/artifacts
+          sha256sum -c checksums.sha256
+
+      - name: Enforce raw data policy (no raw output in artifacts)
+        shell: bash
+        run: |
+          for forbidden in raw_gpu_output.txt raw_help.txt raw_sdk_catalog.txt raw_catalog.txt; do
+            if [ -f "experiments/reliability-harness/artifacts/$forbidden" ]; then
+              echo "ERROR: Forbidden raw file $forbidden detected in artifacts directory!" >&2
+              exit 1
+            fi
+          done
+          echo "RAW_DATA_POLICY=PASS"
+
+      - name: Upload GPU capability evidence artifacts
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: gpu-evidence-${{ github.sha }}-${{ github.run_id }}
+          path: experiments/reliability-harness/artifacts/
+          if-no-files-found: error
+          retention-days: 1

@@ -1,5 +1,6 @@
 /build/
 /.work/
+/artifacts/
 *.tmp
 __pycache__/
 *.pyc
