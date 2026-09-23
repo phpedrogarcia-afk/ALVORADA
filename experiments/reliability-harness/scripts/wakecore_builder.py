@@ -101,12 +101,18 @@ class WakeCoreBuilder:
             return which
         raise WakeCoreBuildError(f"Required build tool '{name}' not found in {self.build_tools_dir} or PATH")
 
-    def build_apk(self, output_apk: Optional[Path] = None) -> Path:
+    def build_apk(self, output_apk: Optional[Path] = None, profile: str = "DEFAULT") -> Path:
         """Build, package, align, sign, and verify the wakecore APK."""
         if not self.android_jar.is_file():
             raise WakeCoreBuildError(f"android.jar not found at {self.android_jar}")
 
-        manifest_file = self.wakecore_dir / "AndroidManifest.xml"
+        if profile.upper() == "PROFILE_A":
+            manifest_file = self.wakecore_dir / "AndroidManifest.profile-a.xml"
+        elif profile.upper() == "PROFILE_B":
+            manifest_file = self.wakecore_dir / "AndroidManifest.profile-b.xml"
+        else:
+            manifest_file = self.wakecore_dir / "AndroidManifest.xml"
+
         if not manifest_file.is_file():
             raise WakeCoreBuildError(f"AndroidManifest.xml not found at {manifest_file}")
 
@@ -324,6 +330,7 @@ def main() -> None:
     parser.add_argument("--wakecore-dir", type=Path, default=None, help="Path to wakecore sources")
     parser.add_argument("--build-dir", type=Path, default=None, help="Build output directory")
     parser.add_argument("--output-apk", type=Path, default=None, help="Path for generated APK")
+    parser.add_argument("--profile", type=str, default="DEFAULT", help="Permission profile: DEFAULT, PROFILE_A, or PROFILE_B")
 
     args = parser.parse_args()
 
@@ -332,7 +339,7 @@ def main() -> None:
         wakecore_dir=args.wakecore_dir,
         build_dir=args.build_dir,
     )
-    apk = builder.build_apk(args.output_apk)
+    apk = builder.build_apk(args.output_apk, profile=args.profile)
     print(f"WAKECORE_APK_BUILD_SUCCESS={apk}")
 
 

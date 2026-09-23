@@ -131,16 +131,33 @@ public final class WakeAlarmReceiver extends BroadcastReceiver {
             store.state = WakeConstants.STATE_TRIGGERED;
             store.triggeredAtEpochMs = triggerWallMs;
             store.triggeredAtMonotonicMs = triggerMonotonicMs;
+            store.wakeSessionCheckpoint = WakeConstants.CHECKPOINT_TRIGGERED;
 
             long scheduledTarget = (targetEpochMs > 0) ? targetEpochMs : store.targetEpochMs;
             if (scheduledTarget > 0) {
                 store.deliveryDeltaMs = triggerWallMs - scheduledTarget;
             }
 
+            // Checkpoint 2: WAKE_SESSION_REQUESTED
+            store.wakeSessionRequestedAtEpochMs = System.currentTimeMillis();
+            store.wakeSessionCheckpoint = WakeConstants.CHECKPOINT_WAKE_SESSION_REQUESTED;
             store.save();
 
-            // 9. Enter Software Audio Checkpoint Path
-            WakeAudioCheckpoint.executeAudioHandoff(store);
+            // 9. Enter Governed Wake Session Path (Lane B4)
+            try {
+                Intent sessionIntent = new Intent(context, WakeSessionService.class);
+                sessionIntent.setAction(WakeConstants.ACTION_START_WAKE_SESSION);
+                sessionIntent.putExtra("occurrence_id", occurrenceId);
+                if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
+                    context.startForegroundService(sessionIntent);
+                } else {
+                    context.startService(sessionIntent);
+                }
+            } catch (Exception e) {
+                Log.e(TAG, "Failed to start WakeSessionService: " + e.getMessage(), e);
+                // Fallback direct execution if service cannot start
+                WakeAudioCheckpoint.executeAudioHandoff(store);
+            }
 
         } finally {
             if (wakeLock != null && wakeLock.isHeld()) {

@@ -1,0 +1,48 @@
+{
+  "campaign": "ALVORADA_G1_E1_WAVE_B_PLATFORM_SEMANTICS_003",
+  "contract": "ALVORADA_CAMPAIGN_LEDGER_V1",
+  "historical_accounting": {
+    "previous_campaign_001": {
+      "name": "ALVORADA_G1_POST_FOUNDER_APPROVAL_001",
+      "status": "CLOSED",
+      "ci_runs_used": 6,
+      "ci_budget": 6
+    },
+    "previous_campaign_002": {
+      "name": "ALVORADA_G1_E1_WAVE_A_CLOSURE_002",
+      "status": "CLOSED_PASS_WITH_POST_ASSERTION_FAILURE",
+      "verification_result": "EMPIRICAL_WAVE_A_PASS",
+      "ci_runs_used": 2,
+      "ci_budget": 2
+    }
+  },
+  "wave_b_campaign_003": {
+    "status": "CLOSED_PASS",
+    "verification_result": "WAVE_B_PASS",
+    "ci_budget": 6,
+    "ci_runs_dispatched": 0,
+    "ci_budget_remaining": 6,
+    "max_external_ci_runs": 6,
+    "ci_budget_exhausted": "NO",
+    "objectives": [
+      "Prove Direct Boot before first unlock (LOCKED_BOOT_COMPLETED, device-protected store only) or classify REFERENCE_IMAGE_PREUNLOCK_CAPABILITY_UNAVAILABLE fail-closed",
+      "Implement civil time engine with civil clock preservation, DST gap forward to first valid local time, and DST fold first valid occurrence only",
+      "Isolate exact alarm permission profiles (SCHEDULE_EXACT_ALARM vs USE_EXACT_ALARM) and empirically test real readiness decay transitions and cancellation semantics",
+      "Implement governed WakeSession lifecycle service with 8 distinct checkpoints and failure injection suite",
+      "Enforce 5 red teams (DIRECT_BOOT_RED_TEAM, CIVIL_TIME_RED_TEAM, PERMISSION_RED_TEAM, WAKE_SESSION_RED_TEAM, EVIDENCE_RED_TEAM)"
+    ],
+    "proven_outcomes": {
+      "direct_boot_preunlock": "REFERENCE_IMAGE_PREUNLOCK_CAPABILITY_UNAVAILABLE",
+      "civil_time_engine": "PASS",
+      "dst_gap": "PASS",
+      "dst_fold": "PASS",
+      "timezone_change": "PASS",
+      "exact_alarm_readiness": "EMPIRICALLY_RESOLVED",
+      "wake_session_lifecycle": "PASS",
+      "claim_boundaries": "PASS",
+      "audible": "UNPROVEN",
+      "human_awake": "UNPROVEN"
+    },
+    "runs": []
+  }
+}

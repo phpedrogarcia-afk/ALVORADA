@@ -9,6 +9,8 @@ public final class WakeConstants {
     // Intent Actions
     public static final String ACTION_ALARM_TRIGGER = "org.alvorada.reliability.wakecore.ALARM_TRIGGER";
     public static final String ACTION_COMMAND = "org.alvorada.reliability.wakecore.COMMAND";
+    public static final String ACTION_START_WAKE_SESSION = "org.alvorada.reliability.wakecore.START_WAKE_SESSION";
+    public static final String ACTION_STOP_WAKE_SESSION = "org.alvorada.reliability.wakecore.STOP_WAKE_SESSION";
 
     // Subcommands for ACTION_COMMAND
     public static final String CMD_CONFIGURE = "CONFIGURE";
@@ -21,6 +23,9 @@ public final class WakeConstants {
     public static final String CMD_RESET = "RESET";
     public static final String CMD_SET_MOCK_TIME = "SET_MOCK_TIME";
     public static final String CMD_SET_AUDIO_FAULT = "SET_AUDIO_FAULT";
+    public static final String CMD_SET_SESSION_FAULT = "SET_SESSION_FAULT";
+    public static final String CMD_CHECK_READINESS = "CHECK_READINESS";
+    public static final String CMD_CHECK_AUTHORITY_DIMENSIONS = "CHECK_AUTHORITY_DIMENSIONS";
 
     // States
     public static final String STATE_IDLE = "IDLE";
@@ -33,18 +38,33 @@ public final class WakeConstants {
     public static final String STATE_DISMISSED = "DISMISSED";
     public static final String STATE_RECOVERED_LATE = "RECOVERED_LATE";
     public static final String STATE_OUTCOME_UNKNOWN = "OUTCOME_UNKNOWN";
+    public static final String STATE_CONFIGURED_NOT_ARMED = "CONFIGURED_NOT_ARMED";
 
-    // Audio Checkpoints
+    // Audio & Session Checkpoints (Lane B4 - 8 distinct checkpoints)
     public static final String CHECKPOINT_NONE = "NONE";
+    public static final String CHECKPOINT_TRIGGERED = "TRIGGERED";
+    public static final String CHECKPOINT_WAKE_SESSION_REQUESTED = "WAKE_SESSION_REQUESTED";
+    public static final String CHECKPOINT_WAKE_SESSION_STARTED = "WAKE_SESSION_STARTED";
+    public static final String CHECKPOINT_NOTIFICATION_POSTED = "NOTIFICATION_POSTED";
+    public static final String CHECKPOINT_SOFTWARE_AUDIO_STARTED = "SOFTWARE_AUDIO_STARTED";
+    public static final String CHECKPOINT_SOFTWARE_AUDIO_CONTINUING = "SOFTWARE_AUDIO_CONTINUING";
+    public static final String CHECKPOINT_WAKE_SESSION_DISMISSED = "WAKE_SESSION_DISMISSED";
+    public static final String CHECKPOINT_WAKE_SESSION_SNOOZED = "WAKE_SESSION_SNOOZED";
+    public static final String CHECKPOINT_WAKE_SESSION_STOPPED = "WAKE_SESSION_STOPPED";
+
+    // Legacy Audio Checkpoints
     public static final String CHECKPOINT_SOFTWARE_AUDIO_REQUESTED = "SOFTWARE_AUDIO_REQUESTED";
     public static final String CHECKPOINT_SOFTWARE_AUDIO_ENGINE_INITIALIZED = "SOFTWARE_AUDIO_ENGINE_INITIALIZED";
     public static final String CHECKPOINT_SOFTWARE_AUDIO_WRITE_ACCEPTED = "SOFTWARE_AUDIO_WRITE_ACCEPTED";
-    public static final String CHECKPOINT_SOFTWARE_AUDIO_STARTED = "SOFTWARE_AUDIO_STARTED";
     public static final String CHECKPOINT_SOFTWARE_AUDIO_FAILED = "SOFTWARE_AUDIO_FAILED";
 
     // Scheduling Routes
     public static final String ROUTE_ALARM_CLOCK = "ALARM_CLOCK";
     public static final String ROUTE_EXACT_ALLOW_IDLE = "EXACT_ALLOW_IDLE";
+
+    // Notification Channel & IDs
+    public static final String NOTIFICATION_CHANNEL_ID = "alvorada_wake_session_channel";
+    public static final int NOTIFICATION_ID = 42001;
 
     // Thresholds
     public static final long LATE_RECOVERY_LIMIT_MS = 10 * 60 * 1000L; // 10 minutes

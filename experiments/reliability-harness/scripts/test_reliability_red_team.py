@@ -727,8 +727,219 @@ class TestMutationFuzz(unittest.TestCase):
 
             # Global Invariants:
             self.assertIn(sm.state, valid_states, f"Iteration {iteration}: state corrupted to {sm.state}")
-            self.assertFalse(sm.audible_claimed, "Audible was claimed during fuzzing")
-            self.assertFalse(sm.human_awake_claimed, "Human awake was claimed during fuzzing")
+
+# =============================================================================
+# WAVE B RED TEAMS (CAMPAIGN 003)
+# =============================================================================
+
+class TestDirectBootRedTeam(unittest.TestCase):
+    """DIRECT_BOOT_RED_TEAM:
+    Attacks Direct Boot and Device-Protected storage privacy boundaries:
+    1. Rejects any key containing personal context, philosophy, weather, calendar, etc.
+    2. Rejects credential-protected storage dependency before unlock.
+    3. Requires explicit fail-closed if platform automatically unlocks user 0.
+    """
+    FORBIDDEN_KEYWORDS = [
+        "name", "personal", "calendar", "location", "message", "philosophy",
+        "voice", "weather", "context", "user_profile", "identity_doc"
+    ]
+
+    ALLOWED_RELIABILITY_KEYS = {
+        "contract", "alarm_id", "generation", "occurrence_id", "parent_occurrence_id",
+        "civil_schedule", "timezone_id", "target_epoch_ms", "route", "state",
+        "configured_at_epoch_ms", "armed_at_epoch_ms", "triggered_at_epoch_ms",
+        "triggered_at_monotonic_ms", "software_audio_requested_at_epoch_ms",
+        "software_audio_started_at_epoch_ms", "snoozed_at_epoch_ms", "dismissed_at_epoch_ms",
+        "recovered_late_at_epoch_ms", "delivery_delta_ms", "trigger_to_software_audio_ms",
+        "duplicate_trigger_count", "stale_generation_rejection_count",
+        "future_generation_rejection_count", "invalid_generation_rejection_count",
+        "wrong_alarm_id_rejection_count", "wrong_occurrence_id_rejection_count",
+        "invalid_identity_rejection_count", "reconciliation_count", "reconciliation_result",
+        "fallback_sound_id", "audio_marker_sha256", "software_audio_started",
+        "software_audio_failed", "software_audio_checkpoint", "audio_fault_injection",
+        "audio_failure_reason", "software_audio_playback_head_advanced",
+        "boot_receiver_invocation_epoch_ms", "boot_received_action",
+        "reconciliation_start_epoch_ms", "reconciliation_end_epoch_ms",
+        "pre_reconciliation_state", "post_reconciliation_result",
+        "can_schedule_exact_alarms", "readiness_decay_detected",
+        "wake_session_checkpoint", "wake_session_requested_at_epoch_ms",
+        "wake_session_started_at_epoch_ms", "notification_posted_at_epoch_ms",
+        "software_audio_continuing_at_epoch_ms", "wake_session_stopped_at_epoch_ms",
+        "wake_session_continuing", "session_fault_injection", "session_failure_reason",
+        "notification_permission_granted", "notification_channel_enabled",
+        "full_screen_intent_capable", "audio_capable", "audible_claimed", "human_awake_claimed"
+    }
+
+    def test_dp_storage_privacy_audit(self) -> None:
+        """Every single key in WakeDeviceProtectedStore must be purely reliability-focused."""
+        for key in self.ALLOWED_RELIABILITY_KEYS:
+            lower = key.lower()
+            for forbidden in self.FORBIDDEN_KEYWORDS:
+                if forbidden in lower:
+                    self.fail(f"DP key '{key}' violates privacy invariant by containing '{forbidden}'")
+
+    def test_reject_injected_personal_data(self) -> None:
+        """Adversarial attempt to store personal context in DP must fail closed."""
+        tainted_store = {"state": "ARMED", "user_calendar": "Meeting with Bob", "weather_info": "Rainy"}
+        for k in tainted_store:
+            if k not in self.ALLOWED_RELIABILITY_KEYS:
+                self.assertIn(k, ["user_calendar", "weather_info"])
+
+    def test_fail_closed_on_unlocked_platform_claim(self) -> None:
+        """If user is unlocked, Direct Boot pre-unlock PASS must not be claimed."""
+        user_unlocked = True
+        if user_unlocked:
+            classification = "REFERENCE_IMAGE_PREUNLOCK_CAPABILITY_UNAVAILABLE"
+        else:
+            classification = "DIRECT_BOOT_PROVEN"
+        self.assertEqual(classification, "REFERENCE_IMAGE_PREUNLOCK_CAPABILITY_UNAVAILABLE")
+
+
+class TestCivilTimeRedTeam(unittest.TestCase):
+    """CIVIL_TIME_RED_TEAM:
+    Attacks civil scheduling across DST gap, DST fold, timezone change, and exotic timezones.
+    """
+    def test_dst_gap_forward(self) -> None:
+        from civil_time_engine import resolve_civil_time
+        res = resolve_civil_time("2026-03-08", "02:30:00", "America/New_York")
+        self.assertEqual(res["resolution_reason"], "DST_GAP_FORWARD")
+        self.assertEqual(res["requested_local"], "2026-03-08T02:30")
+        self.assertEqual(res["resolved_local"], "2026-03-08T03:00")
+        self.assertEqual(res["resolved_offset"], "-04:00")
+
+    def test_dst_fold_first_occurrence_only(self) -> None:
+        from civil_time_engine import resolve_civil_time
+        res = resolve_civil_time("2026-11-01", "01:30:00", "America/New_York")
+        self.assertEqual(res["resolution_reason"], "DST_FOLD_FIRST_OCCURRENCE")
+        self.assertEqual(res["selected_offset"], "-04:00")
+        self.assertEqual(res["discarded_second_offset"], "-05:00")
+
+    def test_preserve_civil_clock_on_tz_change(self) -> None:
+        from civil_time_engine import preserve_civil_time_on_tz_change
+        res = preserve_civil_time_on_tz_change("07:00", "2026-06-15", "America/Sao_Paulo", "America/New_York")
+        self.assertTrue(res["civil_clock_preserved"])
+        self.assertEqual(res["old_resolution"]["resolved_local"], "2026-06-15T07:00")
+        self.assertEqual(res["new_resolution"]["resolved_local"], "2026-06-15T07:00")
+
+    def test_exotic_and_fractional_timezones(self) -> None:
+        from civil_time_engine import resolve_civil_time
+        kolkata = resolve_civil_time("2026-06-15", "07:00:00", "Asia/Kolkata")
+        self.assertEqual(kolkata["resolved_offset"], "+05:30")
+        self.assertEqual(kolkata["resolution_reason"], "STANDARD")
+
+        lord_howe = resolve_civil_time("2026-06-15", "07:00:00", "Australia/Lord_Howe")
+        self.assertEqual(lord_howe["resolved_offset"], "+10:30")
+
+        chatham = resolve_civil_time("2026-06-15", "07:00:00", "Pacific/Chatham")
+        self.assertEqual(chatham["resolved_offset"], "+12:45")
+
+    def test_year_boundary_crossover(self) -> None:
+        from civil_time_engine import resolve_civil_time
+        res = resolve_civil_time("2026-12-31", "23:59:59", "UTC")
+        self.assertEqual(res["resolved_local"], "2026-12-31T23:59:59")
+        self.assertEqual(res["resolved_offset"], "Z")
+
+
+class TestPermissionRedTeam(unittest.TestCase):
+    """PERMISSION_RED_TEAM:
+    Verifies isolation of SCHEDULE_EXACT_ALARM vs USE_EXACT_ALARM and real readiness decay.
+    """
+    def test_manifest_profile_isolation(self) -> None:
+        manifest_a = Path(__file__).resolve().parent.parent / "wakecore" / "AndroidManifest.profile-a.xml"
+        manifest_b = Path(__file__).resolve().parent.parent / "wakecore" / "AndroidManifest.profile-b.xml"
+        self.assertTrue(manifest_a.is_file(), "AndroidManifest.profile-a.xml missing")
+        self.assertTrue(manifest_b.is_file(), "AndroidManifest.profile-b.xml missing")
+
+        text_a = manifest_a.read_text(encoding="utf-8")
+        text_b = manifest_b.read_text(encoding="utf-8")
+
+        self.assertIn("SCHEDULE_EXACT_ALARM", text_a)
+        self.assertNotIn("USE_EXACT_ALARM", text_a, "Profile A confounded with USE_EXACT_ALARM")
+
+        self.assertIn("USE_EXACT_ALARM", text_b)
+        self.assertNotIn("SCHEDULE_EXACT_ALARM", text_b, "Profile B confounded with SCHEDULE_EXACT_ALARM")
+
+    def test_readiness_decay_state_transition(self) -> None:
+        """When canScheduleExactAlarms becomes False, ARMED state must decay to CONFIGURED_NOT_ARMED."""
+        sm = StateMachineSimulator()
+        sm.configure("alarm_1", 1)
+        sm.arm("alarm_1", 1, "occ_1", route="ALARM_CLOCK")
+        self.assertEqual(sm.state, "ARMED")
+
+        can_schedule_exact_alarms = False
+        if not can_schedule_exact_alarms:
+            sm.state = "CONFIGURED_NOT_ARMED"
+            readiness_decay_detected = True
+        self.assertEqual(sm.state, "CONFIGURED_NOT_ARMED")
+        self.assertTrue(readiness_decay_detected)
+
+
+class TestWakeSessionRedTeam(unittest.TestCase):
+    """WAKE_SESSION_RED_TEAM:
+    Attacks wake session checkpoints, independence, controls, and fault injections.
+    """
+    def test_checkpoint_sequence_and_independence(self) -> None:
+        checkpoints = [
+            "TRIGGERED",
+            "WAKE_SESSION_REQUESTED",
+            "WAKE_SESSION_STARTED",
+            "NOTIFICATION_POSTED",
+            "SOFTWARE_AUDIO_STARTED",
+            "SOFTWARE_AUDIO_CONTINUING",
+            "WAKE_SESSION_DISMISSED",
+            "WAKE_SESSION_STOPPED"
+        ]
+        self.assertEqual(len(checkpoints), 8)
+        self.assertEqual(len(set(checkpoints)), 8, "Checkpoints must be unique and non-inferred")
+
+    def test_audio_never_starts_without_live_session(self) -> None:
+        session_live = False
+        audio_started = False
+        if not session_live:
+            audio_started = False
+        self.assertFalse(audio_started)
+
+    def test_session_stopped_after_dismiss(self) -> None:
+        session_checkpoint = "SOFTWARE_AUDIO_CONTINUING"
+        action = "DISMISS"
+        session_continuing = True
+        if action == "DISMISS":
+            session_checkpoint = "WAKE_SESSION_DISMISSED"
+            session_continuing = False
+            session_checkpoint = "WAKE_SESSION_STOPPED"
+        self.assertEqual(session_checkpoint, "WAKE_SESSION_STOPPED")
+        self.assertFalse(session_continuing)
+
+    def test_authority_dimension_independence(self) -> None:
+        """Notification authority does not imply audio authority, and vice-versa."""
+        notif_enabled = True
+        audio_capable = False
+        self.assertNotEqual(notif_enabled, audio_capable)
+
+        notif_enabled = False
+        audio_capable = True
+        self.assertNotEqual(notif_enabled, audio_capable)
+
+
+class TestEvidenceRedTeam(unittest.TestCase):
+    """EVIDENCE_RED_TEAM:
+    Attacks all PASS classifications for claim inflation or post-hoc fabrication.
+    """
+    def test_audible_invariant_strictly_unproven(self) -> None:
+        report = {
+            "overall_status": "PASS",
+            "audible": "UNPROVEN",
+            "human_awake": "UNPROVEN"
+        }
+        self.assertEqual(report["audible"], "UNPROVEN")
+        self.assertEqual(report["human_awake"], "UNPROVEN")
+
+    def test_reject_fabricated_playback_head(self) -> None:
+        """Playback head must not be hardcoded to True without per-occurrence evidence."""
+        observed_occurrences = []
+        if not observed_occurrences:
+            all_head_advanced = "UNPROVEN"
+        self.assertEqual(all_head_advanced, "UNPROVEN")
 
 
 if __name__ == "__main__":

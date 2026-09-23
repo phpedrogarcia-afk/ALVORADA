@@ -2,20 +2,26 @@ package org.alvorada.reliability.wakecore;
 
 import android.content.Context;
 import android.util.Log;
-
-import org.json.JSONException;
-import org.json.JSONObject;
-
+import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
-import java.io.IOException;
+import java.io.InputStreamReader;
 import java.nio.charset.StandardCharsets;
+import org.json.JSONException;
+import org.json.JSONObject;
 
+/**
+ * Thread-safe, direct-boot-aware persistent store stored strictly in Device Protected Storage.
+ *
+ * Epistemic Privacy Invariant:
+ * Strictly contains reliability state material. NEVER stores personal names, calendar data,
+ * location, message text, philosophy, voice text, weather, or personal context.
+ */
 public final class WakeDeviceProtectedStore {
-    private static final String TAG = "WakeDeviceProtectedStore";
+    private static final String TAG = "WakeDPStore";
 
-    // Whitelist state fields strictly compliant with G1 privacy contract
+    // Authority Material
     public String alarmId = "";
     public long generation = 0L;
     public String occurrenceId = "";
@@ -26,7 +32,7 @@ public final class WakeDeviceProtectedStore {
     public String route = "";
     public String state = WakeConstants.STATE_IDLE;
 
-    // Checkpoints
+    // Timestamps (epoch ms)
     public long configuredAtEpochMs = 0L;
     public long armedAtEpochMs = 0L;
     public long triggeredAtEpochMs = 0L;
@@ -55,7 +61,7 @@ public final class WakeDeviceProtectedStore {
     public String fallbackSoundId = "synthetic_wav_marker";
     public String audioMarkerSha256 = "";
 
-    // F-02 Software audio checkpoints & failure injection
+    // Software audio checkpoints & failure injection
     public boolean softwareAudioStarted = false;
     public boolean softwareAudioFailed = false;
     public String softwareAudioCheckpoint = WakeConstants.CHECKPOINT_NONE;
@@ -63,7 +69,7 @@ public final class WakeDeviceProtectedStore {
     public String audioFailureReason = "";
     public boolean softwareAudioPlaybackHeadAdvanced = false;
 
-    // F-03 Boot receiver evidence fields
+    // Boot receiver evidence fields
     public long bootReceiverInvocationEpochMs = 0L;
     public String bootReceivedAction = "";
     public long reconciliationStartEpochMs = 0L;
@@ -71,10 +77,30 @@ public final class WakeDeviceProtectedStore {
     public String preReconciliationState = "";
     public String postReconciliationResult = "";
 
+    // Lane B3 Exact-alarm readiness
+    public boolean canScheduleExactAlarms = true;
+    public boolean readinessDecayDetected = false;
+
+    // Lane B4 Governed Wake Session Checkpoints & Lifecycles
+    public String wakeSessionCheckpoint = WakeConstants.CHECKPOINT_NONE;
+    public long wakeSessionRequestedAtEpochMs = 0L;
+    public long wakeSessionStartedAtEpochMs = 0L;
+    public long notificationPostedAtEpochMs = 0L;
+    public long softwareAudioContinuingAtEpochMs = 0L;
+    public long wakeSessionStoppedAtEpochMs = 0L;
+    public boolean wakeSessionContinuing = false;
+    public String sessionFaultInjection = "NONE";
+    public String sessionFailureReason = "";
+
+    // Independent authority dimensions
+    public boolean notificationPermissionGranted = false;
+    public boolean notificationChannelEnabled = false;
+    public boolean fullScreenIntentCapable = false;
+    public boolean audioCapable = false;
+
     private final Context deviceProtectedContext;
 
     public WakeDeviceProtectedStore(Context context) {
-        // Enforce Direct Boot safe storage context
         this.deviceProtectedContext = context.isDeviceProtectedStorage()
                 ? context
                 : context.createDeviceProtectedStorageContext();
@@ -89,40 +115,45 @@ public final class WakeDeviceProtectedStore {
         return new File(filesDir, WakeConstants.STATE_FILE_NAME);
     }
 
+    public synchronized void load() {
+        File file = getStateFile();
+        if (!file.exists()) {
+            return;
+        }
+
+        StringBuilder sb = new StringBuilder();
+        try (BufferedReader reader = new BufferedReader(
+                new InputStreamReader(new FileInputStream(file), StandardCharsets.UTF_8))) {
+            String line;
+            while ((line = reader.readLine()) != null) {
+                sb.append(line).append('\n');
+            }
+            fromJsonString(sb.toString());
+        } catch (Exception e) {
+            Log.e(TAG, "Failed to load state from " + file.getAbsolutePath(), e);
+        }
+    }
+
     public synchronized void save() {
-        File targetFile = getStateFile();
-        File tempFile = new File(targetFile.getParentFile(), targetFile.getName() + ".tmp");
+        File file = getStateFile();
+        File tempFile = new File(file.getAbsolutePath() + ".tmp");
         try {
             String jsonStr = toJsonString();
             try (FileOutputStream fos = new FileOutputStream(tempFile)) {
                 fos.write(jsonStr.getBytes(StandardCharsets.UTF_8));
                 fos.flush();
             }
-            if (tempFile.renameTo(targetFile) || (targetFile.delete() && tempFile.renameTo(targetFile))) {
-                Log.d(TAG, "State saved to " + targetFile.getAbsolutePath());
+            if (tempFile.renameTo(file)) {
+                Log.d(TAG, "Persisted state to " + file.getAbsolutePath());
             } else {
-                Log.e(TAG, "Failed to atomically rename state file");
+                if (file.delete() && tempFile.renameTo(file)) {
+                    Log.d(TAG, "Persisted state via overwrite to " + file.getAbsolutePath());
+                } else {
+                    Log.e(TAG, "Atomic rename failed for state file");
+                }
             }
         } catch (Exception e) {
-            Log.e(TAG, "Error saving state to device protected storage", e);
-        }
-    }
-
-    public synchronized void load() {
-        File targetFile = getStateFile();
-        if (!targetFile.exists() || targetFile.length() == 0) {
-            return;
-        }
-        try (FileInputStream fis = new FileInputStream(targetFile)) {
-            byte[] buf = new byte[(int) targetFile.length()];
-            int read = fis.read(buf);
-            if (read > 0) {
-                String jsonStr = new String(buf, 0, read, StandardCharsets.UTF_8);
-                fromJsonString(jsonStr);
-                Log.d(TAG, "State loaded: " + state + ", alarmId=" + alarmId + ", occurrenceId=" + occurrenceId);
-            }
-        } catch (Exception e) {
-            Log.e(TAG, "Error loading state from " + targetFile.getAbsolutePath(), e);
+            Log.e(TAG, "Failed to save state to " + file.getAbsolutePath(), e);
         }
     }
 
@@ -171,6 +202,25 @@ public final class WakeDeviceProtectedStore {
         reconciliationEndEpochMs = 0L;
         preReconciliationState = "";
         postReconciliationResult = "";
+
+        canScheduleExactAlarms = true;
+        readinessDecayDetected = false;
+
+        wakeSessionCheckpoint = WakeConstants.CHECKPOINT_NONE;
+        wakeSessionRequestedAtEpochMs = 0L;
+        wakeSessionStartedAtEpochMs = 0L;
+        notificationPostedAtEpochMs = 0L;
+        softwareAudioContinuingAtEpochMs = 0L;
+        wakeSessionStoppedAtEpochMs = 0L;
+        wakeSessionContinuing = false;
+        sessionFaultInjection = "NONE";
+        sessionFailureReason = "";
+
+        notificationPermissionGranted = false;
+        notificationChannelEnabled = false;
+        fullScreenIntentCapable = false;
+        audioCapable = false;
+
         save();
     }
 
@@ -228,7 +278,27 @@ public final class WakeDeviceProtectedStore {
             obj.put("pre_reconciliation_state", preReconciliationState);
             obj.put("post_reconciliation_result", postReconciliationResult);
 
-            // Invariant note: audible is NEVER true in software adapter
+            // Lane B3 fields
+            obj.put("can_schedule_exact_alarms", canScheduleExactAlarms);
+            obj.put("readiness_decay_detected", readinessDecayDetected);
+
+            // Lane B4 fields
+            obj.put("wake_session_checkpoint", wakeSessionCheckpoint);
+            obj.put("wake_session_requested_at_epoch_ms", wakeSessionRequestedAtEpochMs);
+            obj.put("wake_session_started_at_epoch_ms", wakeSessionStartedAtEpochMs);
+            obj.put("notification_posted_at_epoch_ms", notificationPostedAtEpochMs);
+            obj.put("software_audio_continuing_at_epoch_ms", softwareAudioContinuingAtEpochMs);
+            obj.put("wake_session_stopped_at_epoch_ms", wakeSessionStoppedAtEpochMs);
+            obj.put("wake_session_continuing", wakeSessionContinuing);
+            obj.put("session_fault_injection", sessionFaultInjection);
+            obj.put("session_failure_reason", sessionFailureReason);
+
+            obj.put("notification_permission_granted", notificationPermissionGranted);
+            obj.put("notification_channel_enabled", notificationChannelEnabled);
+            obj.put("full_screen_intent_capable", fullScreenIntentCapable);
+            obj.put("audio_capable", audioCapable);
+
+            // Epistemic invariants: audible and human_awake are NEVER claimed true
             obj.put("audible_claimed", false);
             obj.put("human_awake_claimed", false);
 
@@ -289,6 +359,24 @@ public final class WakeDeviceProtectedStore {
             reconciliationEndEpochMs = obj.optLong("reconciliation_end_epoch_ms", 0L);
             preReconciliationState = obj.optString("pre_reconciliation_state", "");
             postReconciliationResult = obj.optString("post_reconciliation_result", "");
+
+            canScheduleExactAlarms = obj.optBoolean("can_schedule_exact_alarms", true);
+            readinessDecayDetected = obj.optBoolean("readiness_decay_detected", false);
+
+            wakeSessionCheckpoint = obj.optString("wake_session_checkpoint", WakeConstants.CHECKPOINT_NONE);
+            wakeSessionRequestedAtEpochMs = obj.optLong("wake_session_requested_at_epoch_ms", 0L);
+            wakeSessionStartedAtEpochMs = obj.optLong("wake_session_started_at_epoch_ms", 0L);
+            notificationPostedAtEpochMs = obj.optLong("notification_posted_at_epoch_ms", 0L);
+            softwareAudioContinuingAtEpochMs = obj.optLong("software_audio_continuing_at_epoch_ms", 0L);
+            wakeSessionStoppedAtEpochMs = obj.optLong("wake_session_stopped_at_epoch_ms", 0L);
+            wakeSessionContinuing = obj.optBoolean("wake_session_continuing", false);
+            sessionFaultInjection = obj.optString("session_fault_injection", "NONE");
+            sessionFailureReason = obj.optString("session_failure_reason", "");
+
+            notificationPermissionGranted = obj.optBoolean("notification_permission_granted", false);
+            notificationChannelEnabled = obj.optBoolean("notification_channel_enabled", false);
+            fullScreenIntentCapable = obj.optBoolean("full_screen_intent_capable", false);
+            audioCapable = obj.optBoolean("audio_capable", false);
         } catch (JSONException e) {
             Log.e(TAG, "Error parsing state JSON", e);
         }

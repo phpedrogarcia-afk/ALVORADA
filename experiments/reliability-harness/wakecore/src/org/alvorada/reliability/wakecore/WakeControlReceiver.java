@@ -96,6 +96,45 @@ public final class WakeControlReceiver extends BroadcastReceiver {
             setResultCode(0);
             setResultData(store.toJsonString());
 
+        } else if (WakeConstants.CMD_SET_SESSION_FAULT.equalsIgnoreCase(cmd)) {
+            String fault = intent.getStringExtra("fault");
+            store.sessionFaultInjection = (fault != null) ? fault : "NONE";
+            store.save();
+            setResultCode(0);
+            setResultData(store.toJsonString());
+
+        } else if (WakeConstants.CMD_CHECK_READINESS.equalsIgnoreCase(cmd)) {
+            boolean canSchedule = scheduler.canScheduleExactAlarms();
+            store.canScheduleExactAlarms = canSchedule;
+            if (!canSchedule && WakeConstants.STATE_ARMED.equals(store.state)) {
+                store.state = WakeConstants.STATE_CONFIGURED_NOT_ARMED;
+                store.readinessDecayDetected = true;
+            }
+            store.save();
+            setResultCode(0);
+            setResultData(store.toJsonString());
+
+        } else if (WakeConstants.CMD_CHECK_AUTHORITY_DIMENSIONS.equalsIgnoreCase(cmd)) {
+            android.app.NotificationManager nm = (android.app.NotificationManager) context.getSystemService(Context.NOTIFICATION_SERVICE);
+            if (nm != null) {
+                store.notificationPermissionGranted = nm.areNotificationsEnabled();
+                if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
+                    android.app.NotificationChannel ch = nm.getNotificationChannel(WakeConstants.NOTIFICATION_CHANNEL_ID);
+                    store.notificationChannelEnabled = (ch == null || ch.getImportance() != android.app.NotificationManager.IMPORTANCE_NONE);
+                } else {
+                    store.notificationChannelEnabled = true;
+                }
+                if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+                    store.fullScreenIntentCapable = nm.canUseFullScreenIntent();
+                } else {
+                    store.fullScreenIntentCapable = true;
+                }
+            }
+            store.audioCapable = true;
+            store.save();
+            setResultCode(0);
+            setResultData(store.toJsonString());
+
         } else if (WakeConstants.CMD_SNOOZE.equalsIgnoreCase(cmd)) {
             // A5 Snooze semantics
             if (WakeConstants.STATE_TRIGGERED.equals(store.state)
@@ -120,7 +159,16 @@ public final class WakeControlReceiver extends BroadcastReceiver {
                     store.occurrenceId = childOccId;
                     store.state = WakeConstants.STATE_SNOOZED;
                     store.snoozedAtEpochMs = System.currentTimeMillis();
+                    store.wakeSessionCheckpoint = WakeConstants.CHECKPOINT_WAKE_SESSION_SNOOZED;
+                    store.wakeSessionContinuing = false;
                     store.save();
+
+                    try {
+                        Intent stopIntent = new Intent(context, WakeSessionService.class);
+                        stopIntent.setAction(WakeConstants.ACTION_STOP_WAKE_SESSION);
+                        context.startService(stopIntent);
+                    } catch (Exception ignored) {}
+
                     setResultCode(0);
                     setResultData(store.toJsonString());
                 } else {
@@ -137,7 +185,15 @@ public final class WakeControlReceiver extends BroadcastReceiver {
             scheduler.cancelOccurrence(store.occurrenceId);
             store.state = WakeConstants.STATE_DISMISSED;
             store.dismissedAtEpochMs = System.currentTimeMillis();
+            store.wakeSessionCheckpoint = WakeConstants.CHECKPOINT_WAKE_SESSION_DISMISSED;
+            store.wakeSessionContinuing = false;
             store.save();
+
+            try {
+                Intent stopIntent = new Intent(context, WakeSessionService.class);
+                stopIntent.setAction(WakeConstants.ACTION_STOP_WAKE_SESSION);
+                context.startService(stopIntent);
+            } catch (Exception ignored) {}
 
             setResultCode(0);
             setResultData(store.toJsonString());

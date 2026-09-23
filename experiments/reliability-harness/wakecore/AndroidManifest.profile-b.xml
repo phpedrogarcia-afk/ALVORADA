@@ -8,8 +8,7 @@
         android:minSdkVersion="31"
         android:targetSdkVersion="36" />
 
-    <!-- Exact alarm scheduling permissions -->
-    <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />
+    <!-- PROFILE B: USE_EXACT_ALARM route ONLY (exercises automatic system-granted access) -->
     <uses-permission android:name="android.permission.USE_EXACT_ALARM" />
 
     <!-- Boot completed and wakelock permissions -->
@@ -22,11 +21,10 @@
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK" />
 
     <application
-        android:label="AlvoradaWakeCore"
+        android:label="AlvoradaWakeCoreProfileB"
         android:hasCode="true"
         android:directBootAware="true">
 
-        <!-- Alarm trigger receiver (called by AlarmManager via explicit component) -->
         <receiver
             android:name=".WakeAlarmReceiver"
             android:exported="false"
@@ -36,7 +34,6 @@
             </intent-filter>
         </receiver>
 
-        <!-- Boot receiver (called upon guest reboot and locked direct boot) -->
         <receiver
             android:name=".WakeBootReceiver"
             android:exported="true"
@@ -47,7 +44,6 @@
             </intent-filter>
         </receiver>
 
-        <!-- Test control and observation receiver (dispatched by e1_scenario_runner) -->
         <receiver
             android:name=".WakeControlReceiver"
             android:exported="true"
@@ -57,7 +53,6 @@
             </intent-filter>
         </receiver>
 
-        <!-- Governed WakeSessionService for durable alarm audio & notification lifecycle -->
         <service
             android:name=".WakeSessionService"
             android:exported="false"

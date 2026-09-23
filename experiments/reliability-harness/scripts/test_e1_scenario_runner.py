@@ -368,6 +368,41 @@ class TestE1ScenarioRunner(unittest.TestCase):
         self.assertTrue((self.output_dir / "manifest.json").is_file())
         self.assertTrue((self.output_dir / "checksums.sha256").is_file())
 
+    def test_run_lane_b1_direct_boot_preunlock(self) -> None:
+        self.runner.run_adb = MagicMock(return_value=(0, "true", ""))
+        res = self.runner.run_lane_b1_direct_boot_preunlock()
+        self.assertEqual(res["direct_boot_preunlock"], "REFERENCE_IMAGE_PREUNLOCK_CAPABILITY_UNAVAILABLE")
+        self.assertEqual(res["ce_storage_required"], "NO")
+
+    def test_run_lane_b2_civil_time_engine(self) -> None:
+        res = self.runner.run_lane_b2_civil_time_engine()
+        self.assertEqual(res["civil_time_engine"], "PASS")
+        self.assertEqual(res["timezone_change"], "PASS")
+        self.assertEqual(res["dst_gap"], "PASS")
+        self.assertEqual(res["dst_fold"], "PASS")
+
+    def test_run_lane_b3_exact_alarm_readiness(self) -> None:
+        self.runner.send_broadcast_cmd = MagicMock(return_value={"can_schedule_exact_alarms": True})
+        self.runner.run_adb = MagicMock(return_value=(0, "", ""))
+        res = self.runner.run_lane_b3_exact_alarm_readiness()
+        self.assertEqual(res["readiness_decay_result"], "READINESS_DECAY_ENFORCED")
+        self.assertEqual(res["result"], "PASS")
+
+    def test_run_lane_b4_wake_session_lifecycle(self) -> None:
+        self.runner.send_broadcast_cmd = MagicMock(return_value={
+            "notification_permission_granted": True,
+            "notification_channel_enabled": True,
+            "full_screen_intent_capable": True,
+            "audio_capable": True,
+            "wake_session_checkpoint": "WAKE_SESSION_DISMISSED"
+        })
+        self.runner.poll_for_state = MagicMock(return_value={"wake_session_checkpoint": "SOFTWARE_AUDIO_CONTINUING"})
+        res = self.runner.run_lane_b4_wake_session_lifecycle()
+        self.assertEqual(res["wake_session"], "PASS")
+        self.assertEqual(res["notification_lifecycle"], "PASS")
+        self.assertEqual(res["background_session_start"], "PASS")
+        self.assertEqual(res["audio_session_continuity"], "PASS")
+
 
 if __name__ == "__main__":
     unittest.main()
