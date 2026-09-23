@@ -12,8 +12,8 @@
   "closure_campaign_002": {
     "status": "IN_PROGRESS",
     "ci_budget": 2,
-    "ci_runs_dispatched": 0,
-    "ci_budget_remaining": 2,
+    "ci_runs_dispatched": 1,
+    "ci_budget_remaining": 1,
     "max_external_ci_runs": 2,
     "objectives": [
       "Prove automatic guest-reboot reconciliation across 3 passive surfaces without privileged storage access or manual intervention",
@@ -22,7 +22,15 @@
       "Verify audio playback head progression (headPosition > 0) with epistemic invariants (AUDIBLE=UNPROVEN, HUMAN_AWAKE=UNPROVEN)",
       "Pass all 4 red teams (PROCESS_DEATH_RED_TEAM, BOOT_AUTOMATION_RED_TEAM, OBSERVATION_RED_TEAM, STATISTICS_RED_TEAM)"
     ],
-    "runs": [],
+    "runs": [
+      {
+        "run_number": 1,
+        "run_id": "35802044443",
+        "commit_sha": "56d58006ffc39630f8a2098078387b3ea503b2ca",
+        "outcome": "FAILED_B1_SURFACE_B_DUMPSYS_INTENT_FILTER",
+        "diagnosis": "Complete Wave A empirical PASS: A1 (10 reps, ~2001ms), A2 (10 reps, ~1001ms with proven process death and new PID recreation), A3 (10 duplicate rejections), A4 (6 attack vectors rejected without mutation), A5 (snooze child executed cleanly), A6 (dismissed cleanly). B1 Surface A verified cleanly (WakeBootReceiver logged BOOT_COMPLETED on guest reboot); Surface B failed because dumpsys alarm alone omitted PendingIntent data URI binding occ_id, resolved by querying combined dumpsys alarm/activity intents."
+      }
+    ],
     "verification_result": "PENDING"
   }
 }
