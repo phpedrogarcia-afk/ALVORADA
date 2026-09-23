@@ -1,0 +1,467 @@
+{
+  "campaign": "ALVORADA_G1_E1_RELIABILITY_001",
+  "completion_time_utc": "2026-09-23T00:42:56Z",
+  "contract": "ALVORADA_E1_SCENARIO_EVIDENCE_V1",
+  "lock_digest": "ac243a03caca0333eec85721cbd27f828a001c3b19ed80d7994e33589f065f05",
+  "overall_status": "PASS",
+  "repository_commit_sha": "890cd119093c8b31ecd46ec8f28194451348757b",
+  "run_id": "35802637509",
+  "scenarios": {
+    "A1_BASELINE": {
+      "details": [
+        {
+          "delivery_delta_ms": 3433,
+          "duplicate_count": 0,
+          "occurrence_id": "occ_a1_rep_1_1790123775452",
+          "repetition": 1,
+          "result": "PASS",
+          "trigger_to_software_audio_ms": 74
+        },
+        {
+          "delivery_delta_ms": 2001,
+          "duplicate_count": 0,
+          "occurrence_id": "occ_a1_rep_2_1790123782228",
+          "repetition": 2,
+          "result": "PASS",
+          "trigger_to_software_audio_ms": 58
+        },
+        {
+          "delivery_delta_ms": 2001,
+          "duplicate_count": 0,
+          "occurrence_id": "occ_a1_rep_3_1790123787640",
+          "repetition": 3,
+          "result": "PASS",
+          "trigger_to_software_audio_ms": 60
+        },
+        {
+          "delivery_delta_ms": 2001,
+          "duplicate_count": 0,
+          "occurrence_id": "occ_a1_rep_4_1790123792992",
+          "repetition": 4,
+          "result": "PASS",
+          "trigger_to_software_audio_ms": 60
+        },
+        {
+          "delivery_delta_ms": 2001,
+          "duplicate_count": 0,
+          "occurrence_id": "occ_a1_rep_5_1790123798342",
+          "repetition": 5,
+          "result": "PASS",
+          "trigger_to_software_audio_ms": 59
+        },
+        {
+          "delivery_delta_ms": 2001,
+          "duplicate_count": 0,
+          "occurrence_id": "occ_a1_rep_6_1790123803674",
+          "repetition": 6,
+          "result": "PASS",
+          "trigger_to_software_audio_ms": 58
+        },
+        {
+          "delivery_delta_ms": 2001,
+          "duplicate_count": 0,
+          "occurrence_id": "occ_a1_rep_7_1790123809003",
+          "repetition": 7,
+          "result": "PASS",
+          "trigger_to_software_audio_ms": 58
+        },
+        {
+          "delivery_delta_ms": 2001,
+          "duplicate_count": 0,
+          "occurrence_id": "occ_a1_rep_8_1790123814327",
+          "repetition": 8,
+          "result": "PASS",
+          "trigger_to_software_audio_ms": 57
+        },
+        {
+          "delivery_delta_ms": 2001,
+          "duplicate_count": 0,
+          "occurrence_id": "occ_a1_rep_9_1790123819647",
+          "repetition": 9,
+          "result": "PASS",
+          "trigger_to_software_audio_ms": 58
+        },
+        {
+          "delivery_delta_ms": 2002,
+          "duplicate_count": 0,
+          "occurrence_id": "occ_a1_rep_10_1790123824970",
+          "repetition": 10,
+          "result": "PASS",
+          "trigger_to_software_audio_ms": 57
+        }
+      ],
+      "repetitions": 10,
+      "result": "PASS",
+      "scenario": "A1_BASELINE"
+    },
+    "A2_PROCESS_DEATH": {
+      "details": [
+        {
+          "delivery_delta_ms": 1002,
+          "duplicate_count": 0,
+          "new_process_pid_proven": true,
+          "occurrence_id": "occ_a2_rep_1_1790123830288",
+          "pid_absence_proven": true,
+          "pid_absent_confirmed": true,
+          "pid_after_trigger": 3116,
+          "pid_before_kill": 1914,
+          "process_recreated": true,
+          "repetition": 1,
+          "result": "PASS",
+          "trigger_to_software_audio_ms": 61
+        },
+        {
+          "delivery_delta_ms": 1001,
+          "duplicate_count": 0,
+          "new_process_pid_proven": true,
+          "occurrence_id": "occ_a2_rep_2_1790123835706",
+          "pid_absence_proven": true,
+          "pid_absent_confirmed": true,
+          "pid_after_trigger": 3215,
+          "pid_before_kill": 3116,
+          "process_recreated": true,
+          "repetition": 2,
+          "result": "PASS",
+          "trigger_to_software_audio_ms": 62
+        },
+        {
+          "delivery_delta_ms": 1002,
+          "duplicate_count": 0,
+          "new_process_pid_proven": true,
+          "occurrence_id": "occ_a2_rep_3_1790123841136",
+          "pid_absence_proven": true,
+          "pid_absent_confirmed": true,
+          "pid_after_trigger": 3311,
+          "pid_before_kill": 3215,
+          "process_recreated": true,
+          "repetition": 3,
+          "result": "PASS",
+          "trigger_to_software_audio_ms": 62
+        },
+        {
+          "delivery_delta_ms": 1002,
+          "duplicate_count": 0,
+          "new_process_pid_proven": true,
+          "occurrence_id": "occ_a2_rep_4_1790123846560",
+          "pid_absence_proven": true,
+          "pid_absent_confirmed": true,
+          "pid_after_trigger": 3408,
+          "pid_before_kill": 3311,
+          "process_recreated": true,
+          "repetition": 4,
+          "result": "PASS",
+          "trigger_to_software_audio_ms": 61
+        },
+        {
+          "delivery_delta_ms": 1002,
+          "duplicate_count": 0,
+          "new_process_pid_proven": true,
+          "occurrence_id": "occ_a2_rep_5_1790123851975",
+          "pid_absence_proven": true,
+          "pid_absent_confirmed": true,
+          "pid_after_trigger": 3504,
+          "pid_before_kill": 3408,
+          "process_recreated": true,
+          "repetition": 5,
+          "result": "PASS",
+          "trigger_to_software_audio_ms": 62
+        },
+        {
+          "delivery_delta_ms": 1001,
+          "duplicate_count": 0,
+          "new_process_pid_proven": true,
+          "occurrence_id": "occ_a2_rep_6_1790123857405",
+          "pid_absence_proven": true,
+          "pid_absent_confirmed": true,
+          "pid_after_trigger": 3600,
+          "pid_before_kill": 3504,
+          "process_recreated": true,
+          "repetition": 6,
+          "result": "PASS",
+          "trigger_to_software_audio_ms": 61
+        },
+        {
+          "delivery_delta_ms": 1001,
+          "duplicate_count": 0,
+          "new_process_pid_proven": true,
+          "occurrence_id": "occ_a2_rep_7_1790123862828",
+          "pid_absence_proven": true,
+          "pid_absent_confirmed": true,
+          "pid_after_trigger": 3697,
+          "pid_before_kill": 3600,
+          "process_recreated": true,
+          "repetition": 7,
+          "result": "PASS",
+          "trigger_to_software_audio_ms": 60
+        },
+        {
+          "delivery_delta_ms": 1001,
+          "duplicate_count": 0,
+          "new_process_pid_proven": true,
+          "occurrence_id": "occ_a2_rep_8_1790123868248",
+          "pid_absence_proven": true,
+          "pid_absent_confirmed": true,
+          "pid_after_trigger": 3795,
+          "pid_before_kill": 3697,
+          "process_recreated": true,
+          "repetition": 8,
+          "result": "PASS",
+          "trigger_to_software_audio_ms": 62
+        },
+        {
+          "delivery_delta_ms": 1002,
+          "duplicate_count": 0,
+          "new_process_pid_proven": true,
+          "occurrence_id": "occ_a2_rep_9_1790123873673",
+          "pid_absence_proven": true,
+          "pid_absent_confirmed": true,
+          "pid_after_trigger": 3892,
+          "pid_before_kill": 3795,
+          "process_recreated": true,
+          "repetition": 9,
+          "result": "PASS",
+          "trigger_to_software_audio_ms": 62
+        },
+        {
+          "delivery_delta_ms": 1002,
+          "duplicate_count": 0,
+          "new_process_pid_proven": true,
+          "occurrence_id": "occ_a2_rep_10_1790123879101",
+          "pid_absence_proven": true,
+          "pid_absent_confirmed": true,
+          "pid_after_trigger": 3988,
+          "pid_before_kill": 3892,
+          "process_recreated": true,
+          "repetition": 10,
+          "result": "PASS",
+          "trigger_to_software_audio_ms": 61
+        }
+      ],
+      "new_process_pid_proven": true,
+      "pid_absence_proven": true,
+      "repetitions": 10,
+      "result": "PASS",
+      "scenario": "A2_PROCESS_DEATH"
+    },
+    "A3_DUPLICATE_DEFENSE": {
+      "duplicates_rejected": 10,
+      "injections": 10,
+      "result": "PASS",
+      "scenario": "A3_DUPLICATE_DEFENSE"
+    },
+    "A4_STALE_GENERATION": {
+      "authority_state_preserved": true,
+      "cases_per_vector": 10,
+      "future_generation_rejections": 10,
+      "invalid_generation_rejections": 10,
+      "invalid_identity_rejections": 10,
+      "result": "PASS",
+      "scenario": "A4_STALE_GENERATION",
+      "stale_rejections": 10,
+      "wrong_alarm_id_rejections": 10,
+      "wrong_occurrence_id_rejections": 10
+    },
+    "A5_SNOOZE": {
+      "child_occurrence_id": "snooze_9f9b8a64",
+      "empirical_test_delay_ms": 2500,
+      "parent_occurrence_id": "parent_occ_1790123894200",
+      "production_contract_delay_ms": 300000,
+      "real_five_minute_wait_executed": false,
+      "result": "PASS",
+      "scenario": "A5_SNOOZE"
+    },
+    "A6_DISMISS": {
+      "occurrence_id": "occ_a6_1790123904809",
+      "recurring_schedule_preserved": true,
+      "result": "PASS",
+      "scenario": "A6_DISMISS"
+    },
+    "AUDIO_FAILURE_INJECTION": {
+      "audio_init_failure_tested": true,
+      "audio_play_failure_tested": true,
+      "audio_write_failure_tested": true,
+      "result": "PASS",
+      "scenario": "AUDIO_FAILURE_INJECTION",
+      "software_audio_false_positive_closed": true
+    },
+    "B1_GUEST_REBOOT": {
+      "alarmmanager_reschedule_proven": true,
+      "boot_receiver_platform_delivery_proven": true,
+      "details": [
+        {
+          "boot_received_action": "android.intent.action.BOOT_COMPLETED",
+          "boot_receiver_invocation_epoch_ms": 1790123954730,
+          "delivery_verified": true,
+          "duplicate_count": 0,
+          "manual_boot_broadcast_used": false,
+          "manual_reconcile_used": false,
+          "occurrence_id": "occ_b1_rep_1_1790123910179",
+          "post_reconciliation_result": "RESCHEDULED_FUTURE",
+          "pre_reconciliation_state": "ARMED",
+          "privileged_dp_storage_read_used": false,
+          "reconciliation_count": 1,
+          "repetition": 1,
+          "result": "PASS",
+          "surface_a_logcat_verified": true,
+          "surface_b_alarmmanager_reschedule_verified": true,
+          "surface_c_dump_state_verified": true
+        },
+        {
+          "boot_received_action": "android.intent.action.BOOT_COMPLETED",
+          "boot_receiver_invocation_epoch_ms": 1790124030944,
+          "delivery_verified": true,
+          "duplicate_count": 0,
+          "manual_boot_broadcast_used": false,
+          "manual_reconcile_used": false,
+          "occurrence_id": "occ_b1_rep_2_1790123985863",
+          "post_reconciliation_result": "RESCHEDULED_FUTURE",
+          "pre_reconciliation_state": "ARMED",
+          "privileged_dp_storage_read_used": false,
+          "reconciliation_count": 1,
+          "repetition": 2,
+          "result": "PASS",
+          "surface_a_logcat_verified": true,
+          "surface_b_alarmmanager_reschedule_verified": true,
+          "surface_c_dump_state_verified": true
+        },
+        {
+          "boot_received_action": "android.intent.action.BOOT_COMPLETED",
+          "boot_receiver_invocation_epoch_ms": 1790124106388,
+          "delivery_verified": true,
+          "duplicate_count": 0,
+          "manual_boot_broadcast_used": false,
+          "manual_reconcile_used": false,
+          "occurrence_id": "occ_b1_rep_3_1790124061132",
+          "post_reconciliation_result": "RESCHEDULED_FUTURE",
+          "pre_reconciliation_state": "ARMED",
+          "privileged_dp_storage_read_used": false,
+          "reconciliation_count": 1,
+          "repetition": 3,
+          "result": "PASS",
+          "surface_a_logcat_verified": true,
+          "surface_b_alarmmanager_reschedule_verified": true,
+          "surface_c_dump_state_verified": true
+        }
+      ],
+      "manual_boot_broadcast_used": false,
+      "manual_reconcile_used": false,
+      "privileged_dp_storage_read_used": false,
+      "repetitions": 3,
+      "result": "PASS",
+      "scenario": "B1_GUEST_REBOOT"
+    },
+    "B2_RECONCILIATION_IDEMPOTENCE": {
+      "invocations": 10,
+      "reconciliation_count": 10,
+      "result": "PASS",
+      "scenario": "B2_RECONCILIATION_IDEMPOTENCE"
+    },
+    "B3_LATE_RECOVERY": {
+      "case_over_10min_result": "OUTCOME_UNKNOWN",
+      "case_under_10min_result": "RECOVERED_LATE",
+      "result": "PASS",
+      "scenario": "B3_LATE_RECOVERY"
+    },
+    "PHASE_11_FORCE_STOP": {
+      "app_woken_by_alarm": false,
+      "causal_classification": "EXPECTED_PLATFORM_CANCELLATION",
+      "package_stopped_state": true,
+      "phase": "PHASE_11_FORCE_STOP",
+      "result": "PASS"
+    },
+    "PHASE_12_READINESS_DECAY": {
+      "causal_classification": "MANIPULATION_DID_NOT_DECAY_READINESS",
+      "phase": "PHASE_12_READINESS_DECAY",
+      "readiness_decay_result": "OBSERVED",
+      "result": "PASS"
+    },
+    "ROUTE_VALIDATION": {
+      "result": "PASS",
+      "route_fail_closed": true,
+      "scenario": "ROUTE_VALIDATION",
+      "unknown_routes_accepted": 0
+    }
+  },
+  "start_time_utc": "2026-09-23T00:35:23Z",
+  "statistical_summary": {
+    "a1_alarm_clock": {
+      "acceptable_count": 10,
+      "count": 10,
+      "delivery_delta_ms": {
+        "max": 3433,
+        "median": 2001.0,
+        "min": 2001,
+        "p95": 3433
+      },
+      "fail_count": 0,
+      "target_count": 0,
+      "timing_bands": {
+        "ACCEPTABLE": 10,
+        "EARLY_TOLERANCE": 0,
+        "FAIL_EARLY": 0,
+        "FAIL_LATE": 0,
+        "TARGET": 0
+      },
+      "trigger_to_software_audio_ms": {
+        "max": 74,
+        "median": 58.0,
+        "min": 57,
+        "p95": 74
+      }
+    },
+    "a2_exact_allow_idle": {
+      "acceptable_count": 0,
+      "count": 10,
+      "delivery_delta_ms": {
+        "max": 1002,
+        "median": 1002.0,
+        "min": 1001,
+        "p95": 1002
+      },
+      "fail_count": 0,
+      "target_count": 10,
+      "timing_bands": {
+        "ACCEPTABLE": 0,
+        "EARLY_TOLERANCE": 0,
+        "FAIL_EARLY": 0,
+        "FAIL_LATE": 0,
+        "TARGET": 10
+      },
+      "trigger_to_software_audio_ms": {
+        "max": 62,
+        "median": 61.5,
+        "min": 60,
+        "p95": 62
+      }
+    },
+    "combined": {
+      "acceptable_count": 10,
+      "count": 20,
+      "delivery_delta_ms": {
+        "max": 3433,
+        "median": 1501.5,
+        "min": 1001,
+        "p95": 2002
+      },
+      "fail_count": 0,
+      "target_count": 10,
+      "timing_bands": {
+        "ACCEPTABLE": 10,
+        "EARLY_TOLERANCE": 0,
+        "FAIL_EARLY": 0,
+        "FAIL_LATE": 0,
+        "TARGET": 10
+      },
+      "trigger_to_software_audio_ms": {
+        "max": 74,
+        "median": 60.5,
+        "min": 57,
+        "p95": 62
+      }
+    },
+    "duplicate_triggers_accepted": 0,
+    "epistemic_classification": "E1_EMULATOR_EVIDENCE_ONLY",
+    "old_statistical_derivation_superseded": "RUN_35758945392_SUPERSEDED",
+    "statistical_derivation_method": "NEAREST_RANK_P95_AND_STATISTICS_MEDIAN"
+  }
+}

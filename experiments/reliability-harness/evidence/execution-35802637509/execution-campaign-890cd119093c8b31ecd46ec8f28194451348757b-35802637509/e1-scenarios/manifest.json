@@ -1,0 +1,8 @@
+{
+  "campaign": "ALVORADA_G1_E1_RELIABILITY_001",
+  "contract": "ALVORADA_E1_SCENARIO_MANIFEST_V1",
+  "lock_digest": "ac243a03caca0333eec85721cbd27f828a001c3b19ed80d7994e33589f065f05",
+  "overall_status": "PASS",
+  "repository_commit_sha": "890cd119093c8b31ecd46ec8f28194451348757b",
+  "run_id": "35802637509"
+}

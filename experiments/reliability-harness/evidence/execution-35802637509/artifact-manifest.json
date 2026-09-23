@@ -1,0 +1,14 @@
+{
+  "run_id": "35802637509",
+  "run_head_sha": "890cd119093c8b31ecd46ec8f28194451348757b",
+  "artifact_id": "10726798128",
+  "artifact_digest": "sha256:18ca71515307ce59b5ae2ae6e7ad2c3407855759af943464418248313010e8c3",
+  "workflow_conclusion": "FAILURE",
+  "scenario_execution_conclusion": "PASS",
+  "preservation_timestamp": "2026-09-23T22:58:00Z",
+  "empirical_scenario_execution": "PASS",
+  "workflow_post_assertion": "FAIL",
+  "scientific_evidence": "USABLE_WITH_EXPLICIT_BOUNDARY",
+  "archive_zip_file": "artifact-10726798128.zip",
+  "extracted_directory": "execution-campaign-890cd119093c8b31ecd46ec8f28194451348757b-35802637509"
+}

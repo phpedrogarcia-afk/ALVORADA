@@ -1,0 +1,48 @@
+ALVORADA WAVE 1 LOCKED ENVIRONMENT PROVISIONING REPORT
+======================================================
+Contract:                 ALVORADA_WAVE1_ENVIRONMENT_V1
+Lock Digest:              ac243a03caca0333eec85721cbd27f828a001c3b19ed80d7994e33589f065f05
+Locked Environment Match: TRUE
+Selected GPU Mode:        swiftshader
+
+RUNNER PROVENANCE
+-----------------
+Repository Commit SHA: 890cd119093c8b31ecd46ec8f28194451348757b
+CI Run ID:             35802637509
+Observed At UTC:       2026-09-23T00:34:45Z
+Runner OS:             Linux
+Runner Image Label:    ubuntu24
+Runner Image Version:  20260920.314.1
+
+SDK & RUNTIME ENVIRONMENT
+-------------------------
+Canonical SDK Root:    /usr/local/lib/android/sdk
+Emulator Binary:       /usr/local/lib/android/sdk/emulator/emulator
+Emulator Revision:     37.1.11
+JDK Major Version:     17
+Libpulse Available:    YES
+
+PRE-PROVISIONING OBSERVATIONS
+-----------------------------
+  - build-tools;36.0.0: locked='36.0.0', installed='36.0.0', state=PRESENT_MATCHING_LOCK
+  - emulator: locked='37.1.11', installed='None', state=ABSENT
+  - platform-tools: locked='37.0.1', installed='37.0.1', state=PRESENT_MATCHING_LOCK
+  - platforms;android-36: locked='2', installed='2', state=PRESENT_MATCHING_LOCK
+  - system-images;android-36;default;x86_64: locked='2', installed='None', state=ABSENT
+
+ACTIONS TAKEN
+-------------
+Packages Installed: emulator, system-images;android-36;default;x86_64
+
+POST-PROVISIONING AUDIT (FINAL LOCKED STATE)
+--------------------------------------------
+  - build-tools;36.0.0 -> 36.0.0 [PRESENT_MATCHING_LOCK]
+  - emulator -> 37.1.11 [PRESENT_MATCHING_LOCK]
+  - platform-tools -> 37.0.1 [PRESENT_MATCHING_LOCK]
+  - platforms;android-36 -> 2 [PRESENT_MATCHING_LOCK]
+  - system-images;android-36;default;x86_64 -> 2 [PRESENT_MATCHING_LOCK]
+
+WAVE 1 SCIENTIFIC VERDICT: PASS
+LOCKED_ENVIRONMENT_MATCH = TRUE
+
+END OF WAVE 1 REPORT

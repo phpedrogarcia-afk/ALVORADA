@@ -369,6 +369,7 @@ class E1ScenarioRunner:
                 "result": "PASS",
                 "delivery_delta_ms": delta_ms,
                 "trigger_to_software_audio_ms": audio_latency_ms,
+                "software_audio_playback_head_advanced": final_state.get("software_audio_playback_head_advanced", False),
                 "duplicate_count": dup_count,
             })
 
@@ -454,6 +455,7 @@ class E1ScenarioRunner:
                 "new_process_pid_proven": True,
                 "delivery_delta_ms": delta_ms,
                 "trigger_to_software_audio_ms": audio_latency_ms,
+                "software_audio_playback_head_advanced": final_state.get("software_audio_playback_head_advanced", False),
                 "duplicate_count": dup_count,
                 "result": "PASS",
             })
@@ -1349,7 +1351,18 @@ class E1ScenarioRunner:
                 "epistemic_classification": "E1_EMULATOR_EVIDENCE_ONLY",
             }
             report["statistical_summary"] = summary
-            report["software_audio_playback_head_advanced"] = True
+            # Derive playback head advancement strictly from actual observed occurrences; never fabricate
+            a1_details = a1.get("details", [])
+            a2_details = a2.get("details", [])
+            all_head_obs = [
+                d.get("software_audio_playback_head_advanced")
+                for d in (a1_details + a2_details)
+                if "software_audio_playback_head_advanced" in d
+            ]
+            if all_head_obs and all(all_head_obs):
+                report["software_audio_playback_head_advanced"] = True
+            else:
+                report["software_audio_playback_head_advanced"] = False
             report["overall_status"] = "PASS"
             report["completion_time_utc"] = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
 

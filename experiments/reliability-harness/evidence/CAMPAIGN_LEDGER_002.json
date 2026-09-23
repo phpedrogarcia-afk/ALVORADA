@@ -10,7 +10,7 @@
     "accounting_integrity_note": "Previous campaign accounting preserved without modification; 6 runs were consumed."
   },
   "closure_campaign_002": {
-    "status": "IN_PROGRESS",
+    "status": "CLOSED_PASS_WITH_POST_ASSERTION_FAILURE",
     "ci_budget": 2,
     "ci_runs_dispatched": 2,
     "ci_budget_remaining": 0,
@@ -39,6 +39,6 @@
         "diagnosis": "100% empirical pass on Android reference environment: A1 (10 reps, ~2001ms), A2 (10 reps, ~1001ms, true process death proven with pid_absence_proven=true and new_process_pid_proven=true), A3 (10 duplicate rejections), A4 (6 attack vectors rejected without mutation), A5 (snooze child executed cleanly), A6 (dismissed cleanly), B1 (3 guest reboots: Surface A logcat BOOT_COMPLETED verified, Surface B PendingIntent reschedule verified in AlarmManager, Surface C DUMP_STATE verified, delivery verified without duplicate triggers), B2 (10 reconciliations idempotent), B3 (late recovery policy <=10min vs >10min), Audio Fault Injections, Route Validation, Phase 11, Phase 12. Checksums sha256 passed. The post-execution CI verification script exited with code 1 solely due to software_audio_playback_head_advanced key being omitted from report dict serialization."
       }
     ],
-    "verification_result": "EMPIRICAL_ALL_PASS"
+    "verification_result": "EMPIRICAL_WAVE_A_PASS"
   }
 }
