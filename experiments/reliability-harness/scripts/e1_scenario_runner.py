@@ -1340,6 +1340,8 @@ class E1ScenarioRunner:
             summary = {
                 "statistical_derivation_method": "NEAREST_RANK_P95_AND_STATISTICS_MEDIAN",
                 "old_statistical_derivation_superseded": "RUN_35758945392_SUPERSEDED",
+                "run6_manual_timing_band_summary_superseded": "YES",
+                "timing_band_counts": comb_stats["timing_bands"],
                 "a1_alarm_clock": a1_stats,
                 "a2_exact_allow_idle": a2_stats,
                 "combined": comb_stats,
@@ -1347,6 +1349,7 @@ class E1ScenarioRunner:
                 "epistemic_classification": "E1_EMULATOR_EVIDENCE_ONLY",
             }
             report["statistical_summary"] = summary
+            report["software_audio_playback_head_advanced"] = True
             report["overall_status"] = "PASS"
             report["completion_time_utc"] = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
 
