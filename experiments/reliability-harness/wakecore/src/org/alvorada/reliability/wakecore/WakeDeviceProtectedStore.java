@@ -61,6 +61,7 @@ public final class WakeDeviceProtectedStore {
     public String softwareAudioCheckpoint = WakeConstants.CHECKPOINT_NONE;
     public String audioFaultInjection = "NONE";
     public String audioFailureReason = "";
+    public boolean softwareAudioPlaybackHeadAdvanced = false;
 
     // F-03 Boot receiver evidence fields
     public long bootReceiverInvocationEpochMs = 0L;
@@ -161,6 +162,7 @@ public final class WakeDeviceProtectedStore {
         softwareAudioCheckpoint = WakeConstants.CHECKPOINT_NONE;
         audioFaultInjection = "NONE";
         audioFailureReason = "";
+        softwareAudioPlaybackHeadAdvanced = false;
         audioMarkerSha256 = "";
 
         bootReceiverInvocationEpochMs = 0L;
@@ -217,6 +219,7 @@ public final class WakeDeviceProtectedStore {
             obj.put("software_audio_checkpoint", softwareAudioCheckpoint);
             obj.put("audio_fault_injection", audioFaultInjection);
             obj.put("audio_failure_reason", audioFailureReason);
+            obj.put("software_audio_playback_head_advanced", softwareAudioPlaybackHeadAdvanced);
 
             obj.put("boot_receiver_invocation_epoch_ms", bootReceiverInvocationEpochMs);
             obj.put("boot_received_action", bootReceivedAction);
@@ -278,6 +281,7 @@ public final class WakeDeviceProtectedStore {
             softwareAudioCheckpoint = obj.optString("software_audio_checkpoint", WakeConstants.CHECKPOINT_NONE);
             audioFaultInjection = obj.optString("audio_fault_injection", "NONE");
             audioFailureReason = obj.optString("audio_failure_reason", "");
+            softwareAudioPlaybackHeadAdvanced = obj.optBoolean("software_audio_playback_head_advanced", false);
 
             bootReceiverInvocationEpochMs = obj.optLong("boot_receiver_invocation_epoch_ms", 0L);
             bootReceivedAction = obj.optString("boot_received_action", "");

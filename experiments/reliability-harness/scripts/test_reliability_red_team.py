@@ -10,8 +10,15 @@ import statistics
 import tempfile
 from typing import Any, Dict, List, Optional, Tuple
 import unittest
+from unittest.mock import MagicMock, patch
 
-from e1_scenario_runner import CONTRACT_E1_EVIDENCE, APPROVED_LOCK_DIGEST
+from e1_scenario_runner import (
+    CONTRACT_E1_EVIDENCE,
+    APPROVED_LOCK_DIGEST,
+    E1ScenarioRunner,
+    E1ScenarioError,
+    classify_timing_band,
+)
 
 
 class StateMachineSimulator:
@@ -42,6 +49,18 @@ class StateMachineSimulator:
         self.audio_fault_injection = "NONE"
         self.audible_claimed = False
         self.human_awake_claimed = False
+
+    def dump_state(self) -> Dict[str, Any]:
+        """Pure read-only state observation. Never mutates authority or state."""
+        return {
+            "state": self.state,
+            "alarm_id": self.alarm_id,
+            "generation": self.generation,
+            "occurrence_id": self.occurrence_id,
+            "reconciliation_count": self.reconciliation_count,
+            "duplicate_count": self.duplicate_count,
+            "audio_sessions_started": self.audio_sessions_started,
+        }
 
     def configure(self, alarm_id: str, generation: int, civil_schedule: str = "07:00") -> str:
         if generation < 1:
@@ -466,9 +485,131 @@ class TestBootRecoveryRedTeam(unittest.TestCase):
         self.assertEqual(res_out, "SUPPRESSED_OVERDUE_PAST_LIMIT")
         self.assertEqual(self.sm.state, "OUTCOME_UNKNOWN")
 
+    def test_dump_state_purity(self) -> None:
+        """DUMP_STATE must be completely read-only and never mutate authority or trigger counters."""
+        self.sm.configure("alarm_1", 1)
+        self.sm.arm("alarm_1", 1, "occ_1")
+
+        state_before = copy.deepcopy(self.sm.dump_state())
+        for _ in range(50):
+            d = self.sm.dump_state()
+            self.assertEqual(d["state"], "ARMED")
+            self.assertEqual(d["alarm_id"], "alarm_1")
+            self.assertEqual(d["generation"], 1)
+            self.assertEqual(d["occurrence_id"], "occ_1")
+            self.assertEqual(d["reconciliation_count"], 0)
+            self.assertEqual(d["duplicate_count"], 0)
+            self.assertEqual(d["audio_sessions_started"], 0)
+
+        state_after = copy.deepcopy(self.sm.dump_state())
+        self.assertEqual(state_before, state_after)
+
+    @patch.object(E1ScenarioRunner, "poll_for_state")
+    @patch.object(E1ScenarioRunner, "get_state")
+    @patch.object(E1ScenarioRunner, "run_adb")
+    @patch.object(E1ScenarioRunner, "send_broadcast_cmd")
+    def test_boot_automation_disqualification_missing_surfaces(
+        self, mock_cmd: MagicMock, mock_adb: MagicMock, mock_state: MagicMock, mock_poll: MagicMock
+    ) -> None:
+        """If logcat does NOT show genuine BOOT_COMPLETED, B1 must fail fail-closed."""
+        temp_dir = tempfile.TemporaryDirectory()
+        runner = E1ScenarioRunner(
+            serial="emulator-5554",
+            adb_bin="adb",
+            output_dir=Path(temp_dir.name) / "artifacts",
+            repo_sha="mock_sha",
+            run_id="run_test",
+        )
+        mock_cmd.return_value = {"state": "ARMED"}
+        def fake_adb(*args: Any, **kwargs: Any) -> tuple[int, str, str]:
+            if "sys.boot_completed" in args:
+                return (0, "1\n", "")
+            elif "pm" in args and "path" in args:
+                return (0, "package:/data/app/org.alvorada.reliability.wakecore\n", "")
+            elif "logcat" in args and "-d" in args:
+                # No BOOT_COMPLETED in logcat
+                return (0, "01-01 10:00:00.000 SomeOtherReceiver: something\n", "")
+            return (0, "", "")
+
+        mock_adb.side_effect = fake_adb
+        t_b1 = [1000.0]
+        def adv_time_b1() -> float:
+            t_b1[0] += 10.0
+            return t_b1[0]
+
+        with patch("time.sleep"), patch("time.time", side_effect=adv_time_b1):
+            with self.assertRaises(E1ScenarioError) as ctx:
+                runner.run_scenario_b1(repetitions=1)
+        self.assertIn("Surface A failed", str(ctx.exception))
+        temp_dir.cleanup()
+
 
 # =============================================================================
-# RED TEAM 4: STATISTICS_RED_TEAM
+# RED TEAM 4: PROCESS_DEATH_RED_TEAM
+# =============================================================================
+class TestProcessDeathRedTeam(unittest.TestCase):
+    def setUp(self) -> None:
+        self.temp_dir = tempfile.TemporaryDirectory()
+        self.output_dir = Path(self.temp_dir.name) / "artifacts"
+        self.runner = E1ScenarioRunner(
+            serial="emulator-5554",
+            adb_bin="adb",
+            output_dir=self.output_dir,
+            repo_sha="mock_sha_123",
+            run_id="run_test_456",
+        )
+
+    def tearDown(self) -> None:
+        self.temp_dir.cleanup()
+
+    @patch.object(E1ScenarioRunner, "get_app_pid")
+    @patch.object(E1ScenarioRunner, "poll_for_state")
+    @patch.object(E1ScenarioRunner, "run_adb")
+    @patch.object(E1ScenarioRunner, "send_broadcast_cmd")
+    def test_process_death_not_proven_raises_error(
+        self, mock_cmd: MagicMock, mock_adb: MagicMock, mock_poll: MagicMock, mock_pid: MagicMock
+    ) -> None:
+        """If process remains alive after am kill timeout, A2 MUST fail with E1ScenarioError."""
+        mock_cmd.return_value = {"state": "ARMED"}
+        mock_adb.return_value = (0, "killed", "")
+        # PID before kill is 1001, but polling never sees None (process stayed alive)
+        mock_pid.return_value = "1001"
+        t_a2 = [1000.0]
+        def adv_time_a2() -> float:
+            t_a2[0] += 2.0
+            return t_a2[0]
+
+        with patch("time.sleep"), patch("time.time", side_effect=adv_time_a2):
+            with self.assertRaises(E1ScenarioError) as ctx:
+                self.runner.run_scenario_a2(repetitions=1)
+        self.assertIn("PROCESS_DEATH_NOT_PROVEN", str(ctx.exception))
+
+    @patch.object(E1ScenarioRunner, "get_app_pid")
+    @patch.object(E1ScenarioRunner, "poll_for_state")
+    @patch.object(E1ScenarioRunner, "run_adb")
+    @patch.object(E1ScenarioRunner, "send_broadcast_cmd")
+    def test_process_recreation_same_pid_raises_error(
+        self, mock_cmd: MagicMock, mock_adb: MagicMock, mock_poll: MagicMock, mock_pid: MagicMock
+    ) -> None:
+        """If process PID after trigger is identical to before kill, A2 MUST fail."""
+        mock_cmd.return_value = {"state": "ARMED"}
+        mock_adb.return_value = (0, "killed", "")
+        # Before kill: 1001, after kill: None, after trigger: 1001 (same PID!)
+        mock_pid.side_effect = ["1001", None, "1001"]
+        mock_poll.return_value = {
+            "state": "SOFTWARE_AUDIO_STARTED",
+            "duplicate_trigger_count": 0,
+            "delivery_delta_ms": 15,
+            "trigger_to_software_audio_ms": 50,
+        }
+        with patch("time.sleep"):
+            with self.assertRaises(E1ScenarioError) as ctx:
+                self.runner.run_scenario_a2(repetitions=1)
+        self.assertIn("PROCESS_RECREATION_NOT_PROVEN", str(ctx.exception))
+
+
+# =============================================================================
+# RED TEAM 5: STATISTICS_RED_TEAM
 # =============================================================================
 class TestStatisticsRedTeam(unittest.TestCase):
     def test_nearest_rank_p95_formula(self) -> None:
@@ -517,6 +658,21 @@ class TestStatisticsRedTeam(unittest.TestCase):
         self.assertEqual(classify(5000), "ACCEPTABLE")
         self.assertEqual(classify(5001), "FAIL_LATE")
         self.assertEqual(classify(10000), "FAIL_LATE")
+
+    def test_classify_timing_band_from_runner(self) -> None:
+        """Verify the runner's classify_timing_band matches frozen contract specification."""
+        self.assertEqual(classify_timing_band(-600), "FAIL_EARLY")
+        self.assertEqual(classify_timing_band(-501), "FAIL_EARLY")
+        self.assertEqual(classify_timing_band(-500), "EARLY_TOLERANCE")
+        self.assertEqual(classify_timing_band(-1), "EARLY_TOLERANCE")
+        self.assertEqual(classify_timing_band(0), "TARGET")
+        self.assertEqual(classify_timing_band(1000), "TARGET")
+        self.assertEqual(classify_timing_band(1001), "TARGET")  # Notice 1001 ms is in TARGET
+        self.assertEqual(classify_timing_band(1999), "TARGET")
+        self.assertEqual(classify_timing_band(2000), "TARGET")
+        self.assertEqual(classify_timing_band(2001), "ACCEPTABLE")
+        self.assertEqual(classify_timing_band(5000), "ACCEPTABLE")
+        self.assertEqual(classify_timing_band(5001), "FAIL_LATE")
 
     def test_route_stratification_and_superseded_detection(self) -> None:
         """Verify route stratification separates ALARM_CLOCK and EXACT_ALLOW_IDLE."""

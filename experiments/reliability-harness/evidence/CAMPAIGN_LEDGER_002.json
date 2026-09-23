@@ -1,0 +1,28 @@
+{
+  "campaign": "ALVORADA_G1_E1_WAVE_A_CLOSURE_002",
+  "contract": "ALVORADA_CAMPAIGN_LEDGER_V1",
+  "historical_accounting": {
+    "previous_campaign": "ALVORADA_G1_POST_FOUNDER_APPROVAL_001",
+    "previous_campaign_status": "CLOSED",
+    "previous_campaign_ci_budget": 6,
+    "previous_campaign_ci_runs_used": 6,
+    "previous_campaign_budget_exhausted": "YES",
+    "accounting_integrity_note": "Previous campaign accounting preserved without modification; 6 runs were consumed."
+  },
+  "closure_campaign_002": {
+    "status": "IN_PROGRESS",
+    "ci_budget": 2,
+    "ci_runs_dispatched": 0,
+    "ci_budget_remaining": 2,
+    "max_external_ci_runs": 2,
+    "objectives": [
+      "Prove automatic guest-reboot reconciliation across 3 passive surfaces without privileged storage access or manual intervention",
+      "Prove true process death in A2 with PID absence confirmation and new PID recreation",
+      "Verify statistical timing contract alignment (0-2000ms TARGET band) and supersede ad-hoc 1000ms boundary note",
+      "Verify audio playback head progression (headPosition > 0) with epistemic invariants (AUDIBLE=UNPROVEN, HUMAN_AWAKE=UNPROVEN)",
+      "Pass all 4 red teams (PROCESS_DEATH_RED_TEAM, BOOT_AUTOMATION_RED_TEAM, OBSERVATION_RED_TEAM, STATISTICS_RED_TEAM)"
+    ],
+    "runs": [],
+    "verification_result": "PENDING"
+  }
+}

@@ -47,6 +47,28 @@ class E1ScenarioError(Exception):
     """Raised when scenario setup, execution, or verification fails."""
 
 
+def classify_timing_band(delta: float) -> str:
+    """Classify timing delta into frozen contract bands.
+
+    Contract:
+        delta < -500: FAIL_EARLY
+        -500 <= delta < 0: EARLY_TOLERANCE
+        0 <= delta <= 2000: TARGET
+        2000 < delta <= 5000: ACCEPTABLE
+        delta > 5000: FAIL_LATE
+    """
+    if delta < -500:
+        return "FAIL_EARLY"
+    elif delta < 0:
+        return "EARLY_TOLERANCE"
+    elif delta <= 2000:
+        return "TARGET"
+    elif delta <= 5000:
+        return "ACCEPTABLE"
+    else:
+        return "FAIL_LATE"
+
+
 class E1ScenarioRunner:
     def __init__(
         self,
@@ -272,8 +294,10 @@ class E1ScenarioRunner:
     def get_app_pid(self) -> Optional[int]:
         code, stdout, _ = self.run_adb("shell", "pidof", PACKAGE_NAME, check=False)
         out = stdout.strip()
-        if out and out.isdigit():
-            return int(out)
+        if out:
+            parts = out.split()
+            if parts and parts[0].isdigit():
+                return int(parts[0])
         return None
 
     def poll_for_state(
@@ -378,11 +402,25 @@ class E1ScenarioRunner:
             if arm.get("state") != "ARMED":
                 raise E1ScenarioError(f"A2 rep {rep}: failed to reach ARMED: {arm}")
 
-            # 2. Kill application process (simulate low memory killer / background kill)
-            self.run_adb("shell", "am", "kill", PACKAGE_NAME, check=False)
-            time.sleep(0.5)
+            # 2. Capture PID before kill (must be running)
+            pid_before_kill = self.get_app_pid()
+            if pid_before_kill is None:
+                raise E1ScenarioError(f"A2 rep {rep}: process not running before kill")
 
-            # 3. Wait for AlarmManager to wake process and reach SOFTWARE_AUDIO_STARTED
+            # 3. Kill application process (simulate low memory killer / background kill)
+            self.run_adb("shell", "am", "kill", PACKAGE_NAME, check=False)
+
+            # 4. Verify process death (poll until pidof returns None within 5.0s)
+            dead_deadline = time.time() + 5.0
+            pid_after_kill = self.get_app_pid()
+            while pid_after_kill is not None and time.time() < dead_deadline:
+                time.sleep(0.2)
+                pid_after_kill = self.get_app_pid()
+
+            if pid_after_kill is not None:
+                raise E1ScenarioError(f"A2 rep {rep}: PROCESS_DEATH_NOT_PROVEN, PID {pid_after_kill} still alive after am kill")
+
+            # 5. Do not start the application manually. Wait for AlarmManager trigger.
             final_state = self.poll_for_state(["SOFTWARE_AUDIO_STARTED"], timeout_seconds=14.0)
             st = final_state.get("state")
             if st != "SOFTWARE_AUDIO_STARTED":
@@ -390,23 +428,41 @@ class E1ScenarioRunner:
                 reason = final_state.get("audio_failure_reason")
                 raise E1ScenarioError(f"A2 rep {rep}: failed to trigger after process kill, current={st}, checkpoint={chk}, reason={reason}")
 
+            # 6. Capture PID after trigger (must be present and distinct from PID before kill)
+            pid_after_trigger = self.get_app_pid()
+            if pid_after_trigger is None:
+                raise E1ScenarioError(f"A2 rep {rep}: process not running after alarm trigger")
+            if pid_after_trigger == pid_before_kill:
+                raise E1ScenarioError(f"A2 rep {rep}: PROCESS_RECREATION_NOT_PROVEN, PID after trigger {pid_after_trigger} == PID before kill")
+
             dup_count = final_state.get("duplicate_trigger_count", 0)
+            if dup_count != 0:
+                raise E1ScenarioError(f"A2 rep {rep}: duplicate triggers recorded: {dup_count}")
+
             delta_ms = final_state.get("delivery_delta_ms", 0)
             audio_latency_ms = final_state.get("trigger_to_software_audio_ms", 0)
-            print(f"  [A2 Rep {rep:02d}] PASS | delivery_delta={delta_ms} ms | trigger_to_audio={audio_latency_ms} ms")
+            print(f"  [A2 Rep {rep:02d}] PASS | pid_before={pid_before_kill} -> dead -> pid_after={pid_after_trigger} | delivery_delta={delta_ms} ms | trigger_to_audio={audio_latency_ms} ms")
 
             results.append({
                 "repetition": rep,
                 "occurrence_id": occ_id,
-                "result": "PASS",
+                "pid_before_kill": pid_before_kill,
+                "pid_absent_confirmed": True,
+                "pid_absence_proven": True,
+                "pid_after_trigger": pid_after_trigger,
+                "process_recreated": True,
+                "new_process_pid_proven": True,
                 "delivery_delta_ms": delta_ms,
                 "trigger_to_software_audio_ms": audio_latency_ms,
                 "duplicate_count": dup_count,
+                "result": "PASS",
             })
 
         return {
             "scenario": "A2_PROCESS_DEATH",
             "repetitions": repetitions,
+            "pid_absence_proven": True,
+            "new_process_pid_proven": True,
             "result": "PASS",
             "details": results,
         }
@@ -691,19 +747,23 @@ class E1ScenarioRunner:
             self.reset_state()
             occ_id = f"occ_b1_rep_{rep}_{int(time.time()*1000)}"
 
-            # 1. Arm with target 60 seconds into future
+            # 1. Arm with target 75 seconds into future
             self.send_broadcast_cmd("CONFIGURE", {"alarm_id": "alarm_b1", "generation": 1})
             arm = self.send_broadcast_cmd("ARM", {
                 "alarm_id": "alarm_b1",
                 "generation": 1,
                 "occurrence_id": occ_id,
-                "delay_ms": 60000,
+                "delay_ms": 75000,
                 "route": "ALARM_CLOCK",
             })
             if arm.get("state") != "ARMED":
                 raise E1ScenarioError(f"B1 rep {rep}: failed to reach ARMED: {arm}")
 
-            print(f"  [B1 Rep {rep}] Executing adb reboot...")
+            # Clear logcat baseline and record reboot request epoch ms
+            self.run_adb("logcat", "-c", check=False)
+            reboot_request_epoch_ms = int(time.time() * 1000)
+
+            print(f"  [B1 Rep {rep}] Executing adb reboot at {reboot_request_epoch_ms}...")
             self.run_adb("reboot", check=False)
             time.sleep(5.0)
 
@@ -725,60 +785,107 @@ class E1ScenarioRunner:
             if not booted:
                 raise E1ScenarioError(f"B1 rep {rep}: device failed to boot after reboot")
 
-            # CRITICAL (F-03): DO NOT send manual BOOT_COMPLETED or RECONCILE!
-            # Platform automatically delivers BOOT_COMPLETED. Observe device protected state.
-            print(f"  [B1 Rep {rep}] Awaiting automatic platform BOOT_COMPLETED reconciliation...")
-            rec_deadline = time.time() + 45.0
-            reconciled = False
-            state_data: Dict[str, Any] = {}
-            while time.time() < rec_deadline:
-                state_data = self.read_device_protected_storage_state()
-                rec_result = state_data.get("post_reconciliation_result") or state_data.get("reconciliation_result")
-                rec_count = state_data.get("reconciliation_count", 0)
-                if rec_result == "RESCHEDULED_FUTURE" and rec_count >= 1:
-                    reconciled = True
+            # CRITICAL (F-03 / C1):
+            # DO NOT send manual BOOT_COMPLETED!
+            # DO NOT send manual LOCKED_BOOT_COMPLETED!
+            # DO NOT call RECONCILE!
+            # DO NOT use privileged file access to /data/user_de/0/!
+            print(f"  [B1 Rep {rep}] Observing automatic platform reconciliation across 3 passive surfaces...")
+
+            # --- SURFACE A: LOGCAT ---
+            print(f"  [B1 Rep {rep}] Surface A (Logcat): awaiting platform BOOT_COMPLETED...")
+            logcat_deadline = time.time() + 45.0
+            surface_a_verified = False
+            while time.time() < logcat_deadline:
+                _, logcat_out, _ = self.run_adb("logcat", "-d", "-s", "WakeBootReceiver:I", check=False)
+                if "action=android.intent.action.BOOT_COMPLETED" in logcat_out:
+                    surface_a_verified = True
                     break
                 time.sleep(1.0)
 
-            if not reconciled:
-                raise E1ScenarioError(
-                    f"B1 rep {rep}: automatic boot reconciliation did not produce RESCHEDULED_FUTURE within 45s: {state_data}"
-                )
+            if not surface_a_verified:
+                raise E1ScenarioError(f"B1 rep {rep}: Surface A failed: WakeBootReceiver did not log BOOT_COMPLETED within 45s")
+            print(f"  [B1 Rep {rep}] Surface A (Logcat): PASS | WakeBootReceiver logged BOOT_COMPLETED")
 
-            rec_action = state_data.get("boot_received_action", "")
-            if "MANUAL" in rec_action:
-                raise E1ScenarioError(f"B1 rep {rep}: manual reconciliation was executed: {rec_action}")
+            # --- SURFACE B: ALARMMANAGER DUMPSYS ---
+            print(f"  [B1 Rep {rep}] Surface B (dumpsys alarm): verifying rescheduled PendingIntent...")
+            _, dumpsys_out, _ = self.run_adb("shell", "dumpsys", "alarm", check=False)
+            if PACKAGE_NAME not in dumpsys_out:
+                raise E1ScenarioError(f"B1 rep {rep}: Surface B failed: {PACKAGE_NAME} not found in dumpsys alarm")
+            expected_uri_prefix = f"alvorada://alarm/alarm_b1/1/{occ_id}"
+            if expected_uri_prefix not in dumpsys_out and occ_id not in dumpsys_out:
+                raise E1ScenarioError(f"B1 rep {rep}: Surface B failed: occurrence identity not found in dumpsys alarm")
+            print(f"  [B1 Rep {rep}] Surface B (dumpsys alarm): PASS | Scheduled alarm verified in AlarmManager")
 
-            # Wait for occurrence to trigger
+            # --- SURFACE C: TEST-ONLY READ OBSERVER (DUMP_STATE) ---
+            print(f"  [B1 Rep {rep}] Surface C (DUMP_STATE): querying read-only persisted store state...")
+            state_data = self.send_broadcast_cmd("DUMP_STATE")
+            if not state_data:
+                raise E1ScenarioError(f"B1 rep {rep}: Surface C failed: DUMP_STATE returned empty state")
+
+            boot_action = state_data.get("boot_received_action", "")
+            if boot_action != "android.intent.action.BOOT_COMPLETED":
+                raise E1ScenarioError(f"B1 rep {rep}: Surface C failed: boot_received_action={boot_action} != android.intent.action.BOOT_COMPLETED")
+
+            boot_invoc_ms = state_data.get("boot_receiver_invocation_epoch_ms", 0)
+            if boot_invoc_ms < reboot_request_epoch_ms:
+                raise E1ScenarioError(f"B1 rep {rep}: Surface C failed: boot_receiver_invocation_epoch_ms {boot_invoc_ms} < reboot request time {reboot_request_epoch_ms}")
+
+            rec_count = state_data.get("reconciliation_count", 0)
+            if rec_count < 1:
+                raise E1ScenarioError(f"B1 rep {rep}: Surface C failed: reconciliation_count {rec_count} < 1")
+
+            rec_res = state_data.get("post_reconciliation_result") or state_data.get("reconciliation_result")
+            if rec_res != "RESCHEDULED_FUTURE":
+                raise E1ScenarioError(f"B1 rep {rep}: Surface C failed: post_reconciliation_result={rec_res} != RESCHEDULED_FUTURE")
+
+            pre_state = state_data.get("pre_reconciliation_state")
+            if pre_state != "ARMED":
+                raise E1ScenarioError(f"B1 rep {rep}: Surface C failed: pre_reconciliation_state={pre_state} != ARMED")
+
+            print(f"  [B1 Rep {rep}] Surface C (DUMP_STATE): PASS | action={boot_action}, invoc={boot_invoc_ms}, count={rec_count}, result={rec_res}")
+
+            # Delivery verification
             print(f"  [B1 Rep {rep}] Waiting for scheduled alarm to fire...")
-            final_state = self.poll_for_state(["SOFTWARE_AUDIO_STARTED", "RECOVERED_LATE"], timeout_seconds=80.0)
-            if final_state.get("state") not in ("SOFTWARE_AUDIO_STARTED", "RECOVERED_LATE"):
-                raise E1ScenarioError(f"B1 rep {rep}: alarm did not fire after reboot: {final_state}")
+            final_state = self.poll_for_state(["SOFTWARE_AUDIO_STARTED"], timeout_seconds=90.0)
+            if final_state.get("state") != "SOFTWARE_AUDIO_STARTED":
+                chk = final_state.get("software_audio_checkpoint")
+                reason = final_state.get("audio_failure_reason")
+                raise E1ScenarioError(f"B1 rep {rep}: alarm did not fire after reboot: state={final_state.get('state')}, chk={chk}, reason={reason}")
 
             dup_count = final_state.get("duplicate_trigger_count", 0)
             if dup_count != 0:
                 raise E1ScenarioError(f"B1 rep {rep}: duplicate triggers recorded: {dup_count}")
 
-            print(f"  [B1 Rep {rep}] PASS | automatic boot reconciliation succeeded and fired exactly once")
+            print(f"  [B1 Rep {rep}] PASS | automatic boot reconciliation succeeded and fired cleanly")
             results.append({
                 "repetition": rep,
                 "occurrence_id": occ_id,
                 "result": "PASS",
-                "boot_action_received": rec_action,
-                "reconciliation_result": state_data.get("post_reconciliation_result"),
-                "reconciliation_count": state_data.get("reconciliation_count"),
+                "surface_a_logcat_verified": True,
+                "surface_b_alarmmanager_reschedule_verified": True,
+                "surface_c_dump_state_verified": True,
+                "delivery_verified": True,
+                "boot_received_action": boot_action,
+                "boot_receiver_invocation_epoch_ms": boot_invoc_ms,
+                "reconciliation_count": rec_count,
+                "post_reconciliation_result": rec_res,
+                "pre_reconciliation_state": pre_state,
                 "manual_boot_broadcast_used": False,
                 "manual_reconcile_used": False,
+                "privileged_dp_storage_read_used": False,
                 "duplicate_count": dup_count,
             })
 
         return {
             "scenario": "B1_GUEST_REBOOT",
             "repetitions": repetitions,
-            "result": "PASS",
+            "boot_receiver_platform_delivery_proven": True,
+            "alarmmanager_reschedule_proven": True,
             "manual_boot_broadcast_used": False,
             "manual_reconcile_used": False,
-            "automatic_boot_reconciliation": True,
+            "privileged_dp_storage_read_used": False,
+            "result": "PASS",
             "details": results,
         }
 

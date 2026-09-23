@@ -197,6 +197,32 @@ jobs:
               if s not in scenarios or scenarios[s].get('result') != 'PASS':
                   print(f'ERROR: scenario {s} did not pass: {scenarios.get(s)}', file=sys.stderr)
                   sys.exit(1)
+
+          # C2: Verify true process death in A2
+          a2 = scenarios.get('A2_PROCESS_DEATH', {})
+          if not a2.get('pid_absence_proven') or not a2.get('new_process_pid_proven'):
+              print(f'ERROR: A2 process death / new PID recreation not proven: {a2}', file=sys.stderr)
+              sys.exit(1)
+
+          # C1: Verify multi-surface guest reboot in B1
+          b1 = scenarios.get('B1_GUEST_REBOOT', {})
+          if not b1.get('boot_receiver_platform_delivery_proven') or not b1.get('alarmmanager_reschedule_proven'):
+              print(f'ERROR: B1 multi-surface boot proof incomplete: {b1}', file=sys.stderr)
+              sys.exit(1)
+          for rep_detail in b1.get('details', []):
+              if not (rep_detail.get('surface_a_logcat_verified') and
+                      rep_detail.get('surface_b_alarmmanager_reschedule_verified') and
+                      rep_detail.get('surface_c_dump_state_verified') and
+                      rep_detail.get('delivery_verified')):
+                  print(f'ERROR: B1 rep did not verify all 3 surfaces + delivery: {rep_detail}', file=sys.stderr)
+                  sys.exit(1)
+
+          # Audio strengthening verification
+          if rep.get('software_audio_playback_head_advanced') is not True:
+              print('ERROR: software_audio_playback_head_advanced is not True', file=sys.stderr)
+              sys.exit(1)
+
+          # Statistical contract and timing bands
           stats = rep.get('statistical_summary', {})
           if stats.get('duplicate_triggers_accepted', -1) != 0:
               print(f'ERROR: duplicate triggers accepted != 0: {stats.get(\"duplicate_triggers_accepted\")}', file=sys.stderr)
@@ -204,6 +230,18 @@ jobs:
           if 'a1_alarm_clock' not in stats or 'a2_exact_allow_idle' not in stats or 'combined' not in stats:
               print('ERROR: stratified statistics missing from statistical_summary', file=sys.stderr)
               sys.exit(1)
+
+          tb = stats.get('timing_band_counts', {})
+          if tb.get('FAIL_EARLY', 0) > 0 or tb.get('FAIL_LATE', 0) > 0:
+              print(f'ERROR: timing band failure counts > 0: {tb}', file=sys.stderr)
+              sys.exit(1)
+
+          # P12 readiness decay classification
+          p12 = scenarios.get('PHASE_12_READINESS_DECAY', {})
+          if p12.get('causal_classification') not in ('READINESS_DECAY_ENFORCED', 'MANIPULATION_DID_NOT_DECAY_READINESS', 'ENVIRONMENT_CAPABILITY_NOT_AVAILABLE'):
+              print(f'ERROR: invalid P12 causal classification: {p12.get(\"causal_classification\")}', file=sys.stderr)
+              sys.exit(1)
+
           print('ALL_E1_RELIABILITY_SCENARIOS_VERIFIED_PASS=TRUE')
           "
 

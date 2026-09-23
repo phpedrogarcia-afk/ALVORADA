@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 import tempfile
+import time
 from typing import Any, Dict, List, Optional
 import unittest
 from unittest.mock import MagicMock, patch
@@ -48,14 +49,20 @@ class TestE1ScenarioRunner(unittest.TestCase):
         self.assertEqual(len(res["details"]), 3)
         self.assertEqual(res["details"][0]["delivery_delta_ms"], 12)
 
+    @patch.object(E1ScenarioRunner, "get_app_pid")
     @patch.object(E1ScenarioRunner, "poll_for_state")
     @patch.object(E1ScenarioRunner, "run_adb")
     @patch.object(E1ScenarioRunner, "send_broadcast_cmd")
-    def test_scenario_a2_process_death(self, mock_cmd: MagicMock, mock_adb: MagicMock, mock_poll: MagicMock) -> None:
+    def test_scenario_a2_process_death(
+        self, mock_cmd: MagicMock, mock_adb: MagicMock, mock_poll: MagicMock, mock_pid: MagicMock
+    ) -> None:
         mock_cmd.side_effect = lambda cmd, extras=None: {
             "state": "CONFIGURED" if cmd == "CONFIGURE" else "ARMED" if cmd == "ARM" else "IDLE"
         }
         mock_adb.return_value = (0, "killed", "")
+        # For rep 1: before_kill="1001", after kill=None, after trigger="1002"
+        # For rep 2: before_kill="1002", after kill=None, after trigger="1003"
+        mock_pid.side_effect = ["1001", None, "1002", "1002", None, "1003"]
         mock_poll.return_value = {
             "state": "SOFTWARE_AUDIO_STARTED",
             "duplicate_trigger_count": 0,
@@ -66,6 +73,72 @@ class TestE1ScenarioRunner(unittest.TestCase):
         res = self.runner.run_scenario_a2(repetitions=2)
         self.assertEqual(res["result"], "PASS")
         self.assertEqual(len(res["details"]), 2)
+        self.assertEqual(res["details"][0]["pid_before_kill"], "1001")
+        self.assertTrue(res["details"][0]["pid_absent_confirmed"])
+        self.assertEqual(res["details"][0]["pid_after_trigger"], "1002")
+        self.assertTrue(res["details"][0]["pid_absence_proven"])
+        self.assertTrue(res["details"][0]["new_process_pid_proven"])
+
+    @patch.object(E1ScenarioRunner, "poll_for_state")
+    @patch.object(E1ScenarioRunner, "get_state")
+    @patch.object(E1ScenarioRunner, "run_adb")
+    @patch.object(E1ScenarioRunner, "send_broadcast_cmd")
+    def test_scenario_b1_guest_reboot(
+        self, mock_cmd: MagicMock, mock_adb: MagicMock, mock_state: MagicMock, mock_poll: MagicMock
+    ) -> None:
+        last_occ = [""]
+        def fake_cmd(cmd: str, extras: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+            if cmd == "ARM" and extras:
+                last_occ[0] = extras.get("occurrence_id", "")
+            if cmd == "DUMP_STATE":
+                return {
+                    "state": "ARMED",
+                    "boot_received_action": "android.intent.action.BOOT_COMPLETED",
+                    "boot_receiver_invocation_epoch_ms": int(time.time() * 1000) + 1000,
+                    "reconciliation_count": 1,
+                    "post_reconciliation_result": "RESCHEDULED_FUTURE",
+                    "pre_reconciliation_state": "ARMED",
+                }
+            return {"state": "CONFIGURED" if cmd == "CONFIGURE" else "ARMED" if cmd == "ARM" else "IDLE"}
+
+        mock_cmd.side_effect = fake_cmd
+        def fake_adb(*args: Any, **kwargs: Any) -> tuple[int, str, str]:
+            if "sys.boot_completed" in args:
+                return (0, "1\n", "")
+            elif "pm" in args and "path" in args:
+                return (0, "package:/data/app/org.alvorada.reliability.wakecore\n", "")
+            elif "logcat" in args and "-d" in args:
+                return (0, "01-01 10:00:00.000 WakeBootReceiver: action=android.intent.action.BOOT_COMPLETED\n", "")
+            elif "dumpsys" in args and "alarm" in args:
+                return (0, f"Batch[...]: PendingIntent{{... org.alvorada.reliability.wakecore ... {last_occ[0]} ...}}\n", "")
+            return (0, "", "")
+
+        mock_adb.side_effect = fake_adb
+        mock_state.return_value = {
+            "state": "ARMED",
+            "boot_received_action": "android.intent.action.BOOT_COMPLETED",
+            "boot_receiver_invocation_epoch_ms": 1700000000000,
+            "reconciliation_count": 1,
+            "post_reconciliation_result": "RESCHEDULED_FUTURE",
+            "pre_reconciliation_state": "ARMED",
+        }
+        mock_poll.return_value = {
+            "state": "SOFTWARE_AUDIO_STARTED",
+            "duplicate_trigger_count": 0,
+            "delivery_delta_ms": 25,
+            "trigger_to_software_audio_ms": 40,
+        }
+
+        with patch("time.sleep"):
+            res = self.runner.run_scenario_b1(repetitions=1)
+        self.assertEqual(res["result"], "PASS")
+        self.assertEqual(len(res["details"]), 1)
+        det = res["details"][0]
+        self.assertTrue(det["surface_a_logcat_verified"])
+        self.assertTrue(det["surface_b_alarmmanager_reschedule_verified"])
+        self.assertTrue(det["surface_c_dump_state_verified"])
+        self.assertTrue(det["delivery_verified"])
+
 
     @patch.object(E1ScenarioRunner, "get_state")
     @patch.object(E1ScenarioRunner, "poll_for_state")
@@ -225,7 +298,8 @@ class TestE1ScenarioRunner(unittest.TestCase):
         mock_adb.return_value = (0, "appops success", "")
         mock_cmd.return_value = {"state": "READINESS_DECAY_BLOCKED"}
 
-        res = self.runner.run_phase_12_readiness_decay()
+        with patch("time.sleep"):
+            res = self.runner.run_phase_12_readiness_decay()
         self.assertEqual(res["result"], "PASS")
         self.assertEqual(res["causal_classification"], "READINESS_DECAY_ENFORCED")
         self.assertEqual(res["readiness_decay_result"], "OBSERVED")

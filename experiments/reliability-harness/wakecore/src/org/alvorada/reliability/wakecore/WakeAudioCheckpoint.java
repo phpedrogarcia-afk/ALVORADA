@@ -116,9 +116,12 @@ public final class WakeAudioCheckpoint {
             }
 
             // Bounded playback progress verification
-            SystemClock.sleep(25L);
+            SystemClock.sleep(50L);
             int headPosition = track.getPlaybackHeadPosition();
             Log.d(TAG, "AudioTrack playback head position=" + headPosition);
+            if (headPosition > 0) {
+                store.softwareAudioPlaybackHeadAdvanced = true;
+            }
 
             long startedWallMs = System.currentTimeMillis();
             long startedMonotonicMs = SystemClock.elapsedRealtime();
@@ -140,7 +143,7 @@ public final class WakeAudioCheckpoint {
 
             // EPISTEMIC INVARIANT: Log explicit boundary
             Log.i(TAG, "SOFTWARE_AUDIO_STARTED_AT=" + startedWallMs + " (monotonic=" + startedMonotonicMs + ")");
-            Log.i(TAG, "EPISTEMIC_INVARIANT: SOFTWARE_AUDIO_STARTED=TRUE; AUDIBLE=UNPROVEN; HUMAN_AWAKE=UNPROVEN; SHA256=" + sha256);
+            Log.i(TAG, "EPISTEMIC_INVARIANT: SOFTWARE_AUDIO_STARTED=TRUE; HEAD_ADVANCED=" + store.softwareAudioPlaybackHeadAdvanced + "; AUDIBLE=UNPROVEN; HUMAN_AWAKE=UNPROVEN; SHA256=" + sha256);
 
         } catch (Throwable t) {
             recordAudioFailure(store, "AudioTrack exception: " + t.getMessage());
